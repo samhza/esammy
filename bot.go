@@ -115,7 +115,7 @@ func getMsgImage(m discord.Message) (body io.ReadCloser, gif bool) {
 	for _, url := range urls {
 		resp, err := http.Get(url)
 		if err != nil {
-			return
+			continue
 		}
 		switch mime := resp.Header.Get("Content-Type"); {
 		case mime == "image/gif":
@@ -123,7 +123,7 @@ func getMsgImage(m discord.Message) (body io.ReadCloser, gif bool) {
 		case strings.HasPrefix(mime, "image"):
 		default:
 			resp.Body.Close()
-			return
+			continue
 		}
 		body = resp.Body
 		return
