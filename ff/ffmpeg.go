@@ -21,6 +21,7 @@ func OverlayGIF(input io.Reader, overlay image.Image) ([]byte, error) {
 		return nil, err
 	}
 	defer pipeR.Close()
+	defer pipeW.Close() // double close is fine
 
 	var outbuf bytes.Buffer
 
