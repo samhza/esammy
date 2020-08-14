@@ -2,52 +2,72 @@ package ff
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/png"
-	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+
+	"github.com/pkg/errors"
 )
 
-// OverlayGIF overlays an image onto a GIF
-func OverlayGIF(input io.Reader, overlay image.Image) ([]byte, error) {
-	var pngbuf bytes.Buffer
-	if err := png.Encode(&pngbuf, overlay); err != nil {
-		return nil, err
+func Composite(path, outputformat string, overlay image.Image, pt image.Point, under bool) ([]byte, error) {
+	var c string
+	if under {
+		c = "[1:v][0:v]"
+	} else {
+		c = "[0:v][1:v]"
 	}
-
-	pipeR, pipeW, err := os.Pipe()
-	if err != nil {
-		return nil, err
+	pos := fmt.Sprintf("%d:%d", pt.X, -pt.Y)
+	outpath := "-"
+	pipe := true
+	var palette string
+	if outputformat == "mp4" {
+		tmp, err := ioutil.TempFile("", "esammy.*.mp4")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create temporary file")
+		}
+		defer os.Remove(tmp.Name())
+		outpath = tmp.Name()
+		tmp.Close()
+		pipe = false
+	} else if outputformat == "gif" {
+		palette = ",split [a][b];[a]palettegen [p];[b][p]paletteuse"
 	}
-	defer pipeR.Close()
-	defer pipeW.Close() // double close is fine
-
-	var outbuf bytes.Buffer
-
 	cmd := exec.Command(
 		"ffmpeg",
+		"-y",
 		"-v", "error",
-		"-f", "gif_pipe", "-i", "-",
-		"-f", "png_pipe", "-i", "pipe:3",
-		"-filter_complex", "[0:v][1:v]overlay=0:0,split [a][b];[a] palettegen [p];[b][p] paletteuse",
-		"-f", "gif", "-",
+		"-i", path,
+		"-f", "png_pipe", "-i", "-",
+		"-filter_complex",
+		c+"overlay="+pos+palette,
+		"-f", outputformat, outpath,
 	)
 
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create stdin pipe")
+	}
+
+	var outbuf bytes.Buffer
 	cmd.Stderr = os.Stderr
-	cmd.Stdout = &outbuf
-	cmd.Stdin = input
-	cmd.ExtraFiles = []*os.File{pipeR}
-
+	if pipe {
+		cmd.Stdout = &outbuf
+	}
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to start command")
 	}
 
-	if _, err := pngbuf.WriteTo(pipeW); err != nil {
-		return nil, err
+	if err := png.Encode(stdin, overlay); err != nil {
+		return nil, errors.Wrap(err, "failed to encode png")
 	}
-	pipeW.Close()
+	stdin.Close()
 
 	err = cmd.Wait()
-	return outbuf.Bytes(), err
+	if pipe {
+		return outbuf.Bytes(), err
+	}
+	return ioutil.ReadFile(outpath)
 }

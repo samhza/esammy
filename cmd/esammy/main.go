@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/diamondburned/arikawa/bot"
-	"github.com/erebid/esammy"
+	"github.com/samhza/esammy"
 )
 
 func main() {
