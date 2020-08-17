@@ -29,8 +29,8 @@ func Process(path, outputformat string, opts ProcessOptions) ([]byte, error) {
 
 	outpath := "-"
 	pipe := true
-	if outputformat == "mp4" {
-		tmp, err := ioutil.TempFile("", "esammy.*.mp4")
+	if outputformat != "gif" {
+		tmp, err := ioutil.TempFile("", "esammy.*."+outputformat)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create temporary file")
 		}

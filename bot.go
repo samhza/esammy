@@ -38,6 +38,69 @@ func New() *Bot {
 	return &Bot{nil, ff}
 }
 
+type Media struct {
+	URL    string
+	Height int
+	Width  int
+	GIFV   bool
+}
+
+func getMsgMedia(m discord.Message) *Media {
+	for _, at := range m.Attachments {
+		if at.Height == 0 {
+			continue
+		}
+		return &Media{
+			URL:    at.Proxy,
+			Height: int(at.Height),
+			Width:  int(at.Width),
+		}
+	}
+	for _, em := range m.Embeds {
+		if em.Type == discord.VideoEmbed && em.Provider == nil {
+			return &Media{
+				URL:    em.Video.URL,
+				Height: int(em.Video.Height),
+				Width:  int(em.Video.Width),
+			}
+		}
+		if em.Type == discord.ImageEmbed {
+			return &Media{
+				URL:    em.Thumbnail.Proxy,
+				Height: int(em.Thumbnail.Height),
+				Width:  int(em.Thumbnail.Width),
+			}
+		}
+		if em.Type == discord.GIFVEmbed {
+			return &Media{
+				URL:    em.Video.URL,
+				Height: int(em.Video.Height),
+				Width:  int(em.Video.Width),
+				GIFV:   true,
+			}
+		}
+	}
+	return nil
+}
+
+func (b *Bot) findMedia(m discord.Message) (*Media, error) {
+	media := getMsgMedia(m)
+	if media != nil {
+		return media, nil
+	}
+	msgs, err := b.Ctx.Messages(m.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range msgs {
+		media = getMsgMedia(m)
+		if media != nil {
+			return media, nil
+		}
+	}
+	return nil, errors.New("no media found")
+}
+
 type MemeArguments struct {
 	Top,
 	Bottom string
@@ -73,26 +136,30 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 	now := time.Now()
 	img := false
 	outputformat := ""
-	b, err := bot.findMedia(m,
-		func(mime string) bool {
-			if mime == "image/gif" {
-				outputformat = "gif"
-				return true
-			}
-			if mime == "video/mp4" {
-				outputformat = "mp4"
-				return true
-			}
-			if strings.HasPrefix(mime, "image") {
-				img = true
-				return true
-			}
-			return false
-		},
-	)
+	media, err := bot.findMedia(m)
 	if err != nil {
 		return nil, err
 	}
+	resp, err := http.Get(media.URL)
+	if err != nil {
+		return nil, err
+	}
+	mime := resp.Header.Get("Content-Type")
+	if mime == "image/gif" {
+		outputformat = "gif"
+	} else if strings.HasPrefix(mime, "image") {
+		img = true
+	} else if strings.HasPrefix(mime, "video") {
+		if media.GIFV {
+			outputformat = "gif"
+		} else {
+			outputformat = "mp4"
+		}
+	} else {
+		resp.Body.Close()
+		return nil, errors.New("unsupported file type")
+	}
+	b := resp.Body
 	var meme api.SendMessageFile
 	if img {
 		img, _, err := image.Decode(b)
@@ -143,52 +210,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 	return &api.SendMessageData{
 		Files: []api.SendMessageFile{meme},
 	}, nil
-}
-
-func (b *Bot) findMedia(m discord.Message, checkType func(string) bool) (body io.ReadCloser, err error) {
-	body = getMsgMedia(m, checkType)
-	if body != nil {
-		return
-	}
-	msgs, err := b.Ctx.Messages(m.ChannelID)
-	if err != nil {
-		return
-	}
-	for _, m := range msgs {
-		body = getMsgMedia(m, checkType)
-		if body != nil {
-			return
-		}
-	}
-	return
-}
-
-func getMsgMedia(m discord.Message, checkType func(string) bool) (body io.ReadCloser) {
-	var urls []string
-	for _, at := range m.Attachments {
-		urls = append(urls, at.Proxy)
-	}
-	for _, em := range m.Embeds {
-		if em.Image != nil {
-			urls = append(urls, em.Image.Proxy)
-		}
-		if em.Thumbnail != nil {
-			urls = append(urls, em.Thumbnail.Proxy)
-		}
-	}
-	for _, url := range urls {
-		resp, err := http.Get(url)
-		if err != nil {
-			continue
-		}
-		if !checkType(resp.Header.Get("Content-Type")) {
-			resp.Body.Close()
-			continue
-		}
-		body = resp.Body
-		return
-	}
-	return nil
 }
 
 func probeGIF(path string) (w, h int, err error) {
