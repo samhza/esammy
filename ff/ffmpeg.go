@@ -17,7 +17,6 @@ type ProcessOptions struct {
 	Image     image.Image // Image to draw over or under the input
 	Under     bool        // Whether Image will be drawn under or over the input
 	Point     image.Point // Where the Image/input will be placed, depending on which one is on top
-	Framerate int         // Output framerate. 0 = don't alter framerate
 }
 
 func Process(path, outputformat string, opts ProcessOptions) ([]byte, error) {
