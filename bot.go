@@ -130,8 +130,9 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if err != nil {
 			return nil, errors.Wrap(err, "error probing input")
 		}
-		overlay, pt, under := imgfn(size.Width, size.Height)
-		gif, err := bot.ff.Composite(tmp.Name(), outputformat, overlay, pt, under)
+		opts := ff.ProcessOptions{}
+		opts.Image, opts.Point, opts.Under = imgfn(size.Width, size.Height)
+		gif, err := bot.ff.Process(tmp.Name(), outputformat, opts)
 		if err != nil {
 			return nil, err
 		}

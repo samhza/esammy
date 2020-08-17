@@ -8,21 +8,27 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 )
 
-func Composite(path, outputformat string, overlay image.Image, pt image.Point, under bool) ([]byte, error) {
-	var c string
-	if under {
-		c = "[1:v][0:v]"
-	} else {
-		c = "[0:v][1:v]"
+type ProcessOptions struct {
+	Image     image.Image // Image to draw over or under the input
+	Under     bool        // Whether Image will be drawn under or over the input
+	Point     image.Point // Where the Image/input will be placed, depending on which one is on top
+	Framerate int         // Output framerate. 0 = don't alter framerate
+}
+
+func Process(path, outputformat string, opts ProcessOptions) ([]byte, error) {
+	args := []string{
+		"-y",
+		"-v", "error",
+		"-i", path,
 	}
-	pos := fmt.Sprintf("%d:%d", pt.X, -pt.Y)
+
 	outpath := "-"
 	pipe := true
-	var palette string
 	if outputformat == "mp4" {
 		tmp, err := ioutil.TempFile("", "esammy.*.mp4")
 		if err != nil {
@@ -32,19 +38,25 @@ func Composite(path, outputformat string, overlay image.Image, pt image.Point, u
 		outpath = tmp.Name()
 		tmp.Close()
 		pipe = false
-	} else if outputformat == "gif" {
-		palette = ",split [a][b];[a]palettegen [p];[b][p]paletteuse"
 	}
-	cmd := exec.Command(
-		"ffmpeg",
-		"-y",
-		"-v", "error",
-		"-i", path,
-		"-f", "png_pipe", "-i", "-",
-		"-filter_complex",
-		c+"overlay="+pos+palette,
-		"-f", outputformat, outpath,
-	)
+
+	var filterComplex []string
+	if opts.Image != nil {
+		args = append(args, "-f", "png_pipe", "-i", "-")
+		c := "[0:v][1:v]"
+		if opts.Under {
+			c = "[1:v][0:v]"
+		}
+		overlay := fmt.Sprintf("%soverlay=%d:%d", c, opts.Point.X, -opts.Point.Y)
+		filterComplex = append(filterComplex, overlay)
+	}
+	if outputformat == "gif" {
+		filterComplex = append(filterComplex, "split [a][b];[a]palettegen [p];[b][p]paletteuse")
+	}
+	args = append(args,
+		"-filter_complex", strings.Join(filterComplex, ","),
+		"-f", outputformat, outpath)
+	cmd := exec.Command("ffmpeg", args...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -59,9 +71,10 @@ func Composite(path, outputformat string, overlay image.Image, pt image.Point, u
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "failed to start command")
 	}
-
-	if err := png.Encode(stdin, overlay); err != nil {
-		return nil, errors.Wrap(err, "failed to encode png")
+	if opts.Image != nil {
+		if err := png.Encode(stdin, opts.Image); err != nil {
+			return nil, errors.Wrap(err, "failed to encode png")
+		}
 	}
 	stdin.Close()
 
