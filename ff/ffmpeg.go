@@ -14,9 +14,10 @@ import (
 )
 
 type ProcessOptions struct {
-	Image     image.Image // Image to draw over or under the input
-	Under     bool        // Whether Image will be drawn under or over the input
-	Point     image.Point // Where the Image/input will be placed, depending on which one is on top
+	Image  image.Image // Image to draw over or under the input
+	Under  bool        // Whether Image will be drawn under or over the input
+	Point  image.Point // Where the Image/input will be placed, depending on which one is on top
+	SetPTS float64
 }
 
 func Process(path, outputformat string, opts ProcessOptions) ([]byte, error) {
@@ -40,6 +41,10 @@ func Process(path, outputformat string, opts ProcessOptions) ([]byte, error) {
 	}
 
 	var filterComplex []string
+	if opts.SetPTS != 0 {
+		filter := fmt.Sprintf("setpts=%f*PTS", opts.SetPTS)
+		filterComplex = append(filterComplex, filter)
+	}
 	if opts.Image != nil {
 		args = append(args, "-f", "png_pipe", "-i", "-")
 		c := "[0:v][1:v]"

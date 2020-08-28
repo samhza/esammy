@@ -43,6 +43,9 @@ func Caption(w, h int, text string) (image.Image, image.Point) {
 	wrapped := dc.WordWrap(text, float64(w))
 	_, textH := dc.MeasureMultilineString(strings.Join(wrapped, "\n"), linespc)
 	rectH := textH + padding*2
+	if int(rectH)%2 != 0 {
+		rectH = rectH + 1.0
+	}
 
 	dc = gg.NewContext(w, int(rectH)+h)
 	dc.SetFontFace(face)

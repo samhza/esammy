@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -132,6 +133,84 @@ func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) (*a
 	})
 }
 
+func (bot *Bot) Gif(m *gateway.MessageCreateEvent) (*api.SendMessageData, error) {
+	media, err := bot.findMedia(m.Message)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.Get(media.URL)
+	if err != nil {
+		return nil, err
+	}
+	mime := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(mime, "video") {
+		resp.Body.Close()
+		return nil, errors.New("I can only turn videos into gifs")
+	}
+	opts := ff.ProcessOptions{}
+	tmp, err := ioutil.TempFile("", "esammy.*")
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating temporary file")
+	}
+	defer os.Remove(tmp.Name())
+	io.Copy(tmp, resp.Body)
+	tmp.Close()
+	gif, err := bot.ff.Process(tmp.Name(), "gif", opts)
+	if err != nil {
+		return nil, err
+	}
+	r := bytes.NewReader(gif)
+	file := api.SendMessageFile{Name: "out.gif", Reader: r}
+	return &api.SendMessageData{
+		Files: []api.SendMessageFile{file},
+	}, nil
+}
+
+func (bot *Bot) Speed(m *gateway.MessageCreateEvent) (*api.SendMessageData, error) {
+	now := time.Now()
+	outputformat := ""
+	media, err := bot.findMedia(m.Message)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.Get(media.URL)
+	if err != nil {
+		return nil, err
+	}
+	mime := resp.Header.Get("Content-Type")
+	if mime == "image/gif" {
+		outputformat = "gif"
+	} else if strings.HasPrefix(mime, "video") {
+		if media.GIFV {
+			outputformat = "gif"
+		} else {
+			outputformat = filepath.Ext(media.URL)[1:]
+		}
+	} else {
+		resp.Body.Close()
+		return nil, errors.New("unsupported file type")
+	}
+	b := resp.Body
+	tmp, err := ioutil.TempFile("", "esammy.*")
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating temporary file")
+	}
+	defer os.Remove(tmp.Name())
+	io.Copy(tmp, b)
+	b.Close()
+	opts := ff.ProcessOptions{SetPTS: 0.5}
+	gif, err := bot.ff.Process(tmp.Name(), outputformat, opts)
+	if err != nil {
+		return nil, err
+	}
+	r := bytes.NewReader(gif)
+	meme := api.SendMessageFile{Name: "out." + outputformat, Reader: r}
+	fmt.Println(time.Since(now).Milliseconds())
+	return &api.SendMessageData{
+		Files: []api.SendMessageFile{meme},
+	}, nil
+}
+
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMessageData, error) {
 	now := time.Now()
 	img := false
@@ -153,7 +232,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if media.GIFV {
 			outputformat = "gif"
 		} else {
-			outputformat = "mp4"
+			outputformat = filepath.Ext(media.URL)[1:]
 		}
 	} else {
 		resp.Body.Close()

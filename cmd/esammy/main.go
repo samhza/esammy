@@ -15,7 +15,7 @@ func main() {
 		log.Fatalln("No token provided")
 	}
 	wait, err := bot.Start(token, esammy, func(ctx *bot.Context) error {
-		ctx.HasPrefix = bot.NewPrefix("!")
+		ctx.HasPrefix = bot.NewPrefix("&")
 		return nil
 	})
 	if err != nil {
