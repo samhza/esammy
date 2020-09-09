@@ -133,40 +133,7 @@ func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) (*a
 	})
 }
 
-func (bot *Bot) Gif(m *gateway.MessageCreateEvent) (*api.SendMessageData, error) {
-	media, err := bot.findMedia(m.Message)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.Get(media.URL)
-	if err != nil {
-		return nil, err
-	}
-	mime := resp.Header.Get("Content-Type")
-	if !strings.HasPrefix(mime, "video") {
-		resp.Body.Close()
-		return nil, errors.New("I can only turn videos into gifs")
-	}
-	opts := ff.ProcessOptions{}
-	tmp, err := ioutil.TempFile("", "esammy.*")
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating temporary file")
-	}
-	defer os.Remove(tmp.Name())
-	io.Copy(tmp, resp.Body)
-	tmp.Close()
-	gif, err := bot.ff.Process(tmp.Name(), "gif", opts)
-	if err != nil {
-		return nil, err
-	}
-	r := bytes.NewReader(gif)
-	file := api.SendMessageFile{Name: "out.gif", Reader: r}
-	return &api.SendMessageData{
-		Files: []api.SendMessageFile{file},
-	}, nil
-}
-
-func (bot *Bot) Speed(m *gateway.MessageCreateEvent) (*api.SendMessageData, error) {
+func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.SendMessageData, error) {
 	now := time.Now()
 	outputformat := ""
 	media, err := bot.findMedia(m.Message)
@@ -198,8 +165,11 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent) (*api.SendMessageData, erro
 	defer os.Remove(tmp.Name())
 	io.Copy(tmp, b)
 	b.Close()
-	opts := ff.ProcessOptions{SetPTS: 0.5}
-	gif, err := bot.ff.Process(tmp.Name(), outputformat, opts)
+	setpts := 0.5
+	if len(speed) != 0 {
+		setpts = 1.0 / speed[0]
+	}
+	gif, err := bot.ff.Speed(tmp.Name(), outputformat, setpts)
 	if err != nil {
 		return nil, err
 	}
@@ -276,9 +246,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if err != nil {
 			return nil, errors.Wrap(err, "error probing input")
 		}
-		opts := ff.ProcessOptions{}
-		opts.Image, opts.Point, opts.Under = imgfn(size.Width, size.Height)
-		gif, err := bot.ff.Process(tmp.Name(), outputformat, opts)
+		img, pt, under := imgfn(size.Width, size.Height)
+		gif, err := bot.ff.Composite(tmp.Name(), outputformat, img, under, pt)
 		if err != nil {
 			return nil, err
 		}

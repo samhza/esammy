@@ -26,7 +26,7 @@ func init() {
 func Meme(w, h int, top, bot string) image.Image {
 	dc := gg.NewContext(w, h)
 	dc.Clear()
-	face := truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 12)})
+	face := truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
 	dc.SetFontFace(face)
 	drawOutlinedText(dc, top, float64(w/2), dc.FontHeight()*0.3, 0.5, 0, float64(w))
 	drawOutlinedText(dc, bot, float64(w/2), float64(h)-dc.FontHeight()*0.3, 0.5, 1, float64(w))
