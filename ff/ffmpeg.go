@@ -97,7 +97,7 @@ func Speed(path, outputformat string, speed float64) ([]byte, error) {
 	var filterComplex []string
 	filterf := "setpts=%f*PTS"
 	if outputformat != "gif" {
-		filterf = filterf + "[0:a]atempo=1.0/%[1]f[a]"
+		filterf = filterf + ";[0:a]atempo=1.0/%[1]f[a]"
 		args = append(args, "-map", "[a]")
 	} else {
 		filterComplex = append(filterComplex, "split [a][b];[a]palettegen [p];[b][p]paletteuse")
