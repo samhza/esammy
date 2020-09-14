@@ -36,7 +36,7 @@ func Meme(w, h int, top, bot string) image.Image {
 func Caption(w, h int, text string) (image.Image, image.Point) {
 	padding := float64(h) / 24
 	linespc := 1.2
-	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(h / 8)})
+	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(h / 10)})
 
 	dc := gg.NewContext(0, 0)
 	dc.SetFontFace(face)
