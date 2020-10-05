@@ -50,13 +50,6 @@ func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
 	return err
 }
 
-type Media struct {
-	URL    string
-	Height int
-	Width  int
-	GIFV   bool
-}
-
 type MemeArguments struct {
 	Top,
 	Bottom string
@@ -134,61 +127,6 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.Sen
 	return &api.SendMessageData{
 		Files: []api.SendMessageFile{meme},
 	}, nil
-}
-
-func (b *Bot) findMedia(m discord.Message) (*Media, error) {
-	media := getMsgMedia(m)
-	if media != nil {
-		return media, nil
-	}
-	msgs, err := b.Ctx.Messages(m.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range msgs {
-		media = getMsgMedia(m)
-		if media != nil {
-			return media, nil
-		}
-	}
-	return nil, errors.New("no media found")
-}
-func getMsgMedia(m discord.Message) *Media {
-	for _, at := range m.Attachments {
-		if at.Height == 0 {
-			continue
-		}
-		return &Media{
-			URL:    at.Proxy,
-			Height: int(at.Height),
-			Width:  int(at.Width),
-		}
-	}
-	for _, em := range m.Embeds {
-		if em.Type == discord.VideoEmbed && em.Provider == nil {
-			return &Media{
-				URL:    em.Video.URL,
-				Height: int(em.Video.Height),
-				Width:  int(em.Video.Width),
-			}
-		}
-		if em.Type == discord.ImageEmbed {
-			return &Media{
-				URL:    em.Thumbnail.Proxy,
-				Height: int(em.Thumbnail.Height),
-				Width:  int(em.Thumbnail.Width),
-			}
-		}
-		if em.Type == discord.GIFVEmbed {
-			return &Media{
-				URL:    em.Video.URL,
-				Height: int(em.Video.Height),
-				Width:  int(em.Video.Width),
-				GIFV:   true,
-			}
-		}
-	}
-	return nil
 }
 
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMessageData, error) {
