@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -99,7 +98,7 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.Sen
 		if media.GIFV {
 			outputformat = "gif"
 		} else {
-			outputformat = filepath.Ext(media.URL)[1:]
+			outputformat = "mp4"
 		}
 	} else {
 		resp.Body.Close()
@@ -150,7 +149,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if media.GIFV {
 			outputformat = "gif"
 		} else {
-			outputformat = filepath.Ext(media.URL)[1:]
+			outputformat = "mp4"
 		}
 	} else {
 		resp.Body.Close()
