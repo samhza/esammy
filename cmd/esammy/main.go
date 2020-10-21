@@ -1,21 +1,24 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"os"
 
 	"github.com/diamondburned/arikawa/bot"
 	"github.com/samhza/esammy"
 )
 
 func main() {
-	esammy := esammy.New()
-	token := os.Getenv("BOT_TOKEN")
+	var token, prefix string
+	flag.StringVar(&token, "token", "", "discord bot token")
+	flag.StringVar(&prefix, "prefix", "!", "discord bot prefix")
+	flag.Parse()
 	if token == "" {
 		log.Fatalln("No token provided")
 	}
+	esammy := esammy.New()
 	wait, err := bot.Start(token, esammy, func(ctx *bot.Context) error {
-		ctx.HasPrefix = bot.NewPrefix("!!")
+		ctx.HasPrefix = bot.NewPrefix(prefix)
 		return nil
 	})
 	if err != nil {
