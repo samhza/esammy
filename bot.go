@@ -14,7 +14,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/diamondburned/arikawa/api"
 	"github.com/diamondburned/arikawa/bot"
@@ -88,7 +87,6 @@ func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) (*ap
 }
 
 func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.SendMessageData, error) {
-	now := time.Now()
 	outputformat := ""
 	media, err := bot.findMedia(m.Message)
 	if err != nil {
@@ -129,14 +127,12 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.Sen
 	}
 	r := bytes.NewReader(gif)
 	meme := api.SendMessageFile{Name: "out." + outputformat, Reader: r}
-	fmt.Println(time.Since(now).Milliseconds())
 	return &api.SendMessageData{
 		Files: []api.SendMessageFile{meme},
 	}, nil
 }
 
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMessageData, error) {
-	now := time.Now()
 	img := false
 	outputformat := ""
 	media, err := bot.findMedia(m)
@@ -208,7 +204,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		r := bytes.NewReader(gif)
 		meme = api.SendMessageFile{Name: "out." + outputformat, Reader: r}
 	}
-	fmt.Println(time.Since(now).Milliseconds())
 	return &api.SendMessageData{
 		Files: []api.SendMessageFile{meme},
 	}, nil
