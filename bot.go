@@ -68,7 +68,7 @@ func (m *MemeArguments) CustomParse(args string) error {
 
 func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) (*api.SendMessageData, error) {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
-		return memegen.Meme(w, h, args.Top, args.Bottom),
+		return memegen.Impact(w, h, args.Top, args.Bottom),
 			image.Point{}, false
 	})
 }
@@ -76,6 +76,13 @@ func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) (*api.Se
 func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) (*api.SendMessageData, error) {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
 		img, pt := memegen.Caption(w, h, string(raw))
+		return img, pt, true
+	})
+}
+
+func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) (*api.SendMessageData, error) {
+	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
+		img, pt := memegen.Motivate(w, h, args.Top, args.Bottom)
 		return img, pt, true
 	})
 }

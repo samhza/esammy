@@ -6,11 +6,10 @@ import (
 
 	"github.com/fogleman/gg"
 	"github.com/golang/freetype/truetype"
-	"github.com/samhza/esammy/memegen/assets"
+	"github.com/samhza/esammy/memegen/internal/assets"
 )
 
-var impactFont *truetype.Font
-var captionFont *truetype.Font
+var impactFont, captionFont, timesFont *truetype.Font
 
 func init() {
 	var err error
@@ -20,10 +19,13 @@ func init() {
 	if captionFont, err = truetype.Parse(assets.CaptionTTF); err != nil {
 		panic(err)
 	}
+	if timesFont, err = truetype.Parse(assets.TimesTTF); err != nil {
+		panic(err)
+	}
 }
 
-// Meme generates the text for an Impact font meme
-func Meme(w, h int, top, bot string) image.Image {
+// Impact generates the text for an Impact font meme
+func Impact(w, h int, top, bot string) image.Image {
 	dc := gg.NewContext(w, h)
 	dc.Clear()
 	face := truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
@@ -53,9 +55,64 @@ func Caption(w, h int, text string) (image.Image, image.Point) {
 	dc.DrawRectangle(0, 0, float64(w), rectH)
 	dc.Fill()
 	dc.SetRGB(0, 0, 0)
-	dc.DrawStringWrapped(text, float64(w)/2, rectH/2, 0.5, 0.5, float64(w), linespc, gg.AlignCenter)
+	dc.DrawStringWrapped(text, float64(w)/2,
+		rectH/2,
+		0.5, 0.5,
+		float64(w), linespc, gg.AlignCenter)
 
 	return dc.Image(), image.Point{0, -int(rectH)}
+}
+
+func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
+	padding := int(float64(h) / 10)
+	linespc := 1.2
+	topFace := truetype.NewFace(timesFont, &truetype.Options{Size: float64(h / 8)})
+	botFace := truetype.NewFace(timesFont, &truetype.Options{Size: float64(h / 10)})
+
+	dc := gg.NewContext(0, 0)
+	dc.SetFontFace(topFace)
+	wrapped := dc.WordWrap(top, float64(w))
+	_, topH := dc.MeasureMultilineString(strings.Join(wrapped, "\n"), linespc)
+	dc.SetFontFace(botFace)
+	wrapped = dc.WordWrap(top, float64(w))
+	var botH float64
+	if strings.TrimSpace(bot) != "" {
+		_, botH = dc.MeasureMultilineString(strings.Join(wrapped, "\n"), linespc)
+	}
+
+	imgH := h + int(topH) + int(botH) + padding*3
+	if botH != 0 {
+		imgH += padding
+	}
+	if int(imgH)%2 != 0 {
+		imgH = imgH + 1.0
+	}
+	imgW := w + padding*2
+
+	dc = gg.NewContext(imgW, imgH)
+	dc.SetRGB(0, 0, 0)
+	dc.Clear()
+	dc.SetRGB(1, 1, 1)
+	dc.DrawRectangle(float64(padding)-2, float64(padding)-2, float64(w)+4, float64(h)+4)
+	dc.Fill()
+	dc.SetRGBA(0, 0, 0, 0)
+	dc.DrawRectangle(float64(padding), float64(padding), float64(w), float64(h))
+	dc.Fill()
+	dc.SetRGB(1, 1, 1)
+	dc.SetFontFace(topFace)
+	dc.DrawStringWrapped(top, float64(imgW)/2,
+		float64(padding*2+h)+topH/2,
+		0.5, 0.5,
+		float64(imgW), linespc, gg.AlignCenter)
+	dc.SetFontFace(botFace)
+	if botH != 0 {
+		dc.DrawStringWrapped(bot, float64(imgW)/2,
+			float64(padding*3+h)+topH+botH/2,
+			0.5, 0.5,
+			float64(imgW), linespc, gg.AlignCenter)
+	}
+
+	return dc.Image(), image.Point{padding, -padding}
 }
 
 func drawOutlinedText(dc *gg.Context, s string, x, y, ax, ay, width float64) {
