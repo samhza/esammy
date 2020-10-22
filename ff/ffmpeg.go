@@ -39,7 +39,7 @@ func Composite(path, outputformat string, img image.Image, under bool, point ima
 	if under {
 		c = "[1:v][0:v]"
 	}
-	overlay := fmt.Sprintf("%soverlay=%d:%d", c, point.X, -point.Y)
+	overlay := fmt.Sprintf("%soverlay=%d:%d", c, -point.X, -point.Y)
 	filterComplex = append(filterComplex, overlay)
 	if outputformat == "gif" {
 		filterComplex = append(filterComplex, "split [a][b];[a]palettegen [p];[b][p]paletteuse")

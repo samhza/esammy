@@ -112,7 +112,7 @@ func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 			float64(imgW), linespc, gg.AlignCenter)
 	}
 
-	return dc.Image(), image.Point{padding, -padding}
+	return dc.Image(), image.Point{padding, padding}
 }
 
 func drawOutlinedText(dc *gg.Context, s string, x, y, ax, ay, width float64) {
