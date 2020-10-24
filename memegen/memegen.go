@@ -4,9 +4,9 @@ import (
 	"image"
 	"strings"
 
-	"github.com/fogleman/gg"
 	"github.com/golang/freetype/truetype"
 	"github.com/samhza/esammy/memegen/internal/assets"
+	"github.com/samhza/gg"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
