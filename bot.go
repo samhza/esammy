@@ -166,9 +166,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if err != nil {
 			return nil, err
 		}
-		buf := bytes.NewBuffer(nil)
-		w, h := img.Bounds().Max.X, img.Bounds().Max.Y
-		overlay, pt, under := imgfn(w, h)
+		width, height := img.Bounds().Max.X, img.Bounds().Max.Y
+		overlay, pt, under := imgfn(width, height)
 		var src image.Image
 		var dest draw.Image
 		if under {
@@ -179,11 +178,15 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 			dest = makeDrawable(img)
 		}
 		draw.Draw(dest, dest.Bounds(), src, pt, draw.Over)
-		png.Encode(buf, dest)
+		r, w := io.Pipe()
+		go func() {
+			png.Encode(w, dest)
+			w.Close()
+		}()
 		if err != nil {
 			return nil, err
 		}
-		meme = api.SendMessageFile{Name: "out.png", Reader: buf}
+		meme = api.SendMessageFile{Name: "out.png", Reader: r}
 	} else {
 		tmp, err := ioutil.TempFile("", "esammy.*")
 		if err != nil {

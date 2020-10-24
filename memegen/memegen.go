@@ -24,7 +24,9 @@ func init() {
 	}
 }
 
-// Impact generates the text for an Impact font meme
+// Impact generates the text for an Impact font meme.
+// The returned image is meant to be used as an src for a call to draw.Draw with
+// draw.Over as the op.
 func Impact(w, h int, top, bot string) image.Image {
 	dc := gg.NewContext(w, h)
 	dc.Clear()
@@ -35,6 +37,10 @@ func Impact(w, h int, top, bot string) image.Image {
 	return dc.Image()
 }
 
+// Caption makes an iFunny-like caption meant to have another image overlayed
+// onto it.
+// The returned image and point are meant to be used as dest and sp for a
+// call to draw.Draw with draw.Over as the op.
 func Caption(w, h int, text string) (image.Image, image.Point) {
 	padding := float64(h) / 24
 	linespc := 1.2
@@ -63,6 +69,9 @@ func Caption(w, h int, text string) (image.Image, image.Point) {
 	return dc.Image(), image.Point{0, -int(rectH)}
 }
 
+// Motivate makes a "motivational meme" frame meant to have another image overlayed onto it.
+// The returned image and point are meant to be used as dest and sp for a
+// call to draw.Draw with draw.Over as the op.
 func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 	padding := int(float64(h) / 10)
 	linespc := 1.2
@@ -112,7 +121,7 @@ func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 			float64(imgW), linespc, gg.AlignCenter)
 	}
 
-	return dc.Image(), image.Point{padding, padding}
+	return dc.Image(), image.Point{-padding, -padding}
 }
 
 func drawOutlinedText(dc *gg.Context, s string, x, y, ax, ay, width float64) {
