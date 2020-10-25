@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/diamondburned/arikawa/api"
@@ -27,14 +26,17 @@ import (
 
 type Bot struct {
 	Ctx *bot.Context
-	ff  ff.Throttler
+
+	httpClient *http.Client
+	ff         ff.Throttler
+}
+type Options struct {
 }
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
 
-func New() *Bot {
-	ff := ff.NewThrottler(int64(runtime.GOMAXPROCS(-1) * 2))
-	return &Bot{nil, ff}
+func New(client *http.Client, ff ff.Throttler) *Bot {
+	return &Bot{nil, client, ff}
 }
 
 func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
@@ -92,7 +94,7 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.Sen
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Get(media.URL)
+	resp, err := bot.httpClient.Get(media.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +141,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Get(media.URL)
+	resp, err := bot.httpClient.Get(media.URL)
 	if err != nil {
 		return nil, err
 	}
