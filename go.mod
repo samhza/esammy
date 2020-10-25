@@ -1,4 +1,4 @@
-module github.com/samhza/esammy
+module samhza.com/esammy
 
 go 1.14
 

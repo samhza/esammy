@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/diamondburned/arikawa/bot"
-	"github.com/samhza/esammy"
+	"samhza.com/esammy"
 )
 
 func main() {

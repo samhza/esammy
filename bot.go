@@ -21,8 +21,8 @@ import (
 	"github.com/diamondburned/arikawa/gateway"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"github.com/samhza/esammy/ff"
-	"github.com/samhza/esammy/memegen"
+	"samhza.com/esammy/ff"
+	"samhza.com/esammy/memegen"
 )
 
 type Bot struct {

@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/golang/freetype/truetype"
-	"github.com/samhza/esammy/memegen/internal/assets"
 	"github.com/samhza/gg"
+	"samhza.com/esammy/memegen/internal/assets"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
