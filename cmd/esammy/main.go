@@ -67,6 +67,7 @@ func main() {
 	esammy := esammy.New(httpClient, ffThrottler)
 	wait, err := bot.Start(token, esammy, func(ctx *bot.Context) error {
 		ctx.HasPrefix = bot.NewPrefix(prefixes...)
+		ctx.SilentUnknown.Command = true
 		return nil
 	})
 	if err != nil {
