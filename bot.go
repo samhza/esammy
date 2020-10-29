@@ -20,8 +20,8 @@ import (
 	"github.com/diamondburned/arikawa/gateway"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"samhza.com/esammy/ff"
-	"samhza.com/esammy/memegen"
+	"git.sr.ht/~samhza/esammy/ff"
+	"git.sr.ht/~samhza/esammy/memegen"
 )
 
 type Bot struct {

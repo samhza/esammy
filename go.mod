@@ -1,4 +1,4 @@
-module samhza.com/esammy
+module git.sr.ht/~samhza/esammy
 
 go 1.14
 

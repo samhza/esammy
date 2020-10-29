@@ -11,8 +11,8 @@ import (
 
 	"git.sr.ht/~emersion/go-scfg"
 	"github.com/diamondburned/arikawa/bot"
-	"samhza.com/esammy"
-	"samhza.com/esammy/ff"
+	"git.sr.ht/~samhza/esammy"
+	"git.sr.ht/~samhza/esammy/ff"
 )
 
 func init() {
