@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	git.sr.ht/~emersion/go-scfg v0.0.0-20201019143924-142a8aa629fc
-	github.com/diamondburned/arikawa v1.3.10
+	github.com/diamondburned/arikawa v1.3.11
 	github.com/disintegration/imaging v1.6.2
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gorilla/schema v1.2.0 // indirect
