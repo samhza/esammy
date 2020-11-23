@@ -17,6 +17,12 @@ func (b *Bot) findMedia(m discord.Message) (*Media, error) {
 	if media != nil {
 		return media, nil
 	}
+	if m.ReferencedMessage != nil {
+		media = getMsgMedia(*m.ReferencedMessage)
+		if media != nil {
+			return media, nil
+		}
+	}
 	msgs, err := b.Ctx.Messages(m.ChannelID)
 	if err != nil {
 		return nil, err
