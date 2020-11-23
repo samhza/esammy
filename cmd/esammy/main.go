@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"git.sr.ht/~emersion/go-scfg"
-	"github.com/diamondburned/arikawa/bot"
+	"github.com/diamondburned/arikawa/v2/bot"
 	"git.sr.ht/~samhza/esammy"
 	"git.sr.ht/~samhza/esammy/ff"
 )
