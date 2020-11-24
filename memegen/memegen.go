@@ -4,9 +4,9 @@ import (
 	"image"
 	"strings"
 
+	"git.sr.ht/~samhza/esammy/memegen/internal/assets"
 	"github.com/golang/freetype/truetype"
 	"github.com/samhza/gg"
-	"git.sr.ht/~samhza/esammy/memegen/internal/assets"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
@@ -42,9 +42,9 @@ func Impact(w, h int, top, bot string) image.Image {
 // The returned image and point are meant to be used as dest and sp for a
 // call to draw.Draw with draw.Over as the op.
 func Caption(w, h int, text string) (image.Image, image.Point) {
-	padding := float64(h) / 24
+	padding := float64(w) / 10
 	linespc := 1.2
-	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(h / 10)})
+	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(w) / 10})
 
 	dc := gg.NewContext(0, 0)
 	dc.SetFontFace(face)
