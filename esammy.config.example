@@ -4,3 +4,6 @@ token NzQyNwNTU5MDAyZSjE0ygHoQuxHJoM
 prefix &
 # timeout for fetching meme input (milliseconds, default 30000)
 http-timeout 30000
+# tenor api key
+# (optional, used for fetching gifs instead of mp4s from tenor)
+tenor AAAAAAAAAAAA

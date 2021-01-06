@@ -14,29 +14,34 @@ import (
 	"os"
 	"strings"
 
+	"git.sr.ht/~samhza/esammy/ff"
+	"git.sr.ht/~samhza/esammy/memegen"
+	"git.sr.ht/~samhza/esammy/tenor"
 	"github.com/diamondburned/arikawa/v2/api"
 	"github.com/diamondburned/arikawa/v2/bot"
 	"github.com/diamondburned/arikawa/v2/discord"
 	"github.com/diamondburned/arikawa/v2/gateway"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"git.sr.ht/~samhza/esammy/ff"
-	"git.sr.ht/~samhza/esammy/memegen"
 )
 
 type Bot struct {
 	Ctx *bot.Context
 
 	httpClient *http.Client
+	tenor      *tenor.Client
 	ff         ff.Throttler
-}
-type Options struct {
 }
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
 
-func New(client *http.Client, ff ff.Throttler) *Bot {
-	return &Bot{nil, client, ff}
+func New(client *http.Client, tenorkey string, ff ff.Throttler) *Bot {
+	b := Bot{Ctx: nil, httpClient: client, tenor: nil, ff: ff}
+	if tenorkey != "" {
+		b.tenor = tenor.NewClient(tenorkey)
+		b.tenor.Client = client
+	}
+	return &b
 }
 
 func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
