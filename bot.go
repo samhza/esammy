@@ -21,6 +21,7 @@ import (
 	"github.com/diamondburned/arikawa/v2/bot"
 	"github.com/diamondburned/arikawa/v2/discord"
 	"github.com/diamondburned/arikawa/v2/gateway"
+	"github.com/diamondburned/arikawa/v2/utils/sendpart"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
 )
@@ -133,9 +134,9 @@ func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.Sen
 		return nil, err
 	}
 	r := bytes.NewReader(gif)
-	meme := api.SendMessageFile{Name: "out." + outputformat, Reader: r}
+	meme := sendpart.File{Name: "out." + outputformat, Reader: r}
 	return &api.SendMessageData{
-		Files: []api.SendMessageFile{meme},
+		Files: []sendpart.File{meme},
 	}, nil
 }
 
@@ -166,7 +167,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		return nil, errors.New("unsupported file type")
 	}
 	b := resp.Body
-	var meme api.SendMessageFile
+	var meme sendpart.File
 	if img {
 		img, _, err := image.Decode(b)
 		b.Close()
@@ -193,7 +194,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 		if err != nil {
 			return nil, err
 		}
-		meme = api.SendMessageFile{Name: "out.png", Reader: r}
+		meme = sendpart.File{Name: "out.png", Reader: r}
 	} else {
 		tmp, err := ioutil.TempFile("", "esammy.*")
 		if err != nil {
@@ -212,10 +213,10 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 			return nil, err
 		}
 		r := bytes.NewReader(gif)
-		meme = api.SendMessageFile{Name: "out." + outputformat, Reader: r}
+		meme = sendpart.File{Name: "out." + outputformat, Reader: r}
 	}
 	return &api.SendMessageData{
-		Files: []api.SendMessageFile{meme},
+		Files: []sendpart.File{meme},
 	}, nil
 }
 
