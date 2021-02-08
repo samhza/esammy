@@ -7,6 +7,7 @@ import (
 	"git.sr.ht/~samhza/esammy/memegen/internal/assets"
 	"github.com/golang/freetype/truetype"
 	"github.com/samhza/gg"
+	"golang.org/x/image/font"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
@@ -32,8 +33,12 @@ func Impact(w, h int, top, bot string) image.Image {
 	dc.Clear()
 	face := truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
 	dc.SetFontFace(face)
-	drawOutlinedText(dc, top, float64(w/2), dc.FontHeight()*0.3, 0.5, 0, float64(w))
-	drawOutlinedText(dc, bot, float64(w/2), float64(h)-dc.FontHeight()*0.3, 0.5, 1, float64(w))
+	limitWrappedTextHeight(dc, impactFont, top, float64(w), float64(h)/2, 1.0)
+	drawOutlinedText(dc, top, float64(w/2), dc.FontHeight()*0.3, 0.5, 0, float64(w), 1)
+	face = truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
+	dc.SetFontFace(face)
+	limitWrappedTextHeight(dc, impactFont, bot, float64(w), float64(h)/2, 1.0)
+	drawOutlinedText(dc, bot, float64(w/2), float64(h)-dc.FontHeight()*0.3, 0.5, 1, float64(w), 1)
 	return dc.Image()
 }
 
@@ -44,12 +49,11 @@ func Impact(w, h int, top, bot string) image.Image {
 func Caption(w, h int, text string) (image.Image, image.Point) {
 	padding := float64(w) / 10
 	linespc := 1.2
-	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(w) / 10})
 
 	dc := gg.NewContext(0, 0)
+	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(w) / 10})
 	dc.SetFontFace(face)
-	wrapped := dc.WordWrap(text, float64(w))
-	_, textH := dc.MeasureMultilineString(strings.Join(wrapped, "\n"), linespc)
+	face, textH := limitWrappedTextHeight(dc, captionFont, text, float64(w), float64(h)/2, 1.0)
 	rectH := textH + padding*2
 	if int(rectH)%2 != 0 {
 		rectH = rectH + 1.0
@@ -124,10 +128,10 @@ func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 	return dc.Image(), image.Point{-padding, -padding}
 }
 
-func drawOutlinedText(dc *gg.Context, s string, x, y, ax, ay, width float64) {
+func drawOutlinedText(dc *gg.Context, s string,
+	x, y, ax, ay, width float64, sp float64) {
 	dc.SetRGB(0, 0, 0)
-	n := width / 300
-	const sp float64 = 1.2 // line spacing
+	n := dc.FontHeight() / 20
 	w := width * .95
 	dc.DrawStringWrapped(s, x+n, y+n, ax, ay, w, sp, gg.AlignCenter)
 	dc.DrawStringWrapped(s, x-n, y-n, ax, ay, w, sp, gg.AlignCenter)
@@ -135,4 +139,21 @@ func drawOutlinedText(dc *gg.Context, s string, x, y, ax, ay, width float64) {
 	dc.DrawStringWrapped(s, x-n, y+n, ax, ay, w, sp, gg.AlignCenter)
 	dc.SetRGB(1, 1, 1)
 	dc.DrawStringWrapped(s, x, y, ax, ay, w, sp, gg.AlignCenter)
+}
+
+func limitWrappedTextHeight(dc *gg.Context,
+	fontf *truetype.Font, text string, w, desiredH, linespc float64) (face font.Face, height float64) {
+	textH := func() float64 {
+		wrapped := dc.WordWrap(text, w)
+		withBreaks := strings.Join(wrapped, "\n")
+		_, textH := dc.MeasureMultilineString(withBreaks, linespc)
+		return textH
+	}
+	h := textH()
+	for h > desiredH {
+		face = truetype.NewFace(fontf, &truetype.Options{Size: dc.FontHeight() * 0.75})
+		dc.SetFontFace(face)
+		h = textH()
+	}
+	return face, h
 }
