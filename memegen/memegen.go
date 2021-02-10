@@ -47,13 +47,16 @@ func Impact(w, h int, top, bot string) image.Image {
 // The returned image and point are meant to be used as dest and sp for a
 // call to draw.Draw with draw.Over as the op.
 func Caption(w, h int, text string) (image.Image, image.Point) {
-	padding := float64(w) / 10
 	linespc := 1.2
 
 	dc := gg.NewContext(0, 0)
 	face := truetype.NewFace(captionFont, &truetype.Options{Size: float64(w) / 10})
 	dc.SetFontFace(face)
-	face, textH := limitWrappedTextHeight(dc, captionFont, text, float64(w), float64(h)/2, 1.0)
+	sizedFace, textH := limitWrappedTextHeight(dc, captionFont, text, float64(w), float64(h)/2, 1.0)
+	if sizedFace != nil {
+		face = sizedFace
+	}
+	padding := dc.FontHeight() / 2
 	rectH := textH + padding*2
 	if int(rectH)%2 != 0 {
 		rectH = rectH + 1.0
@@ -149,11 +152,11 @@ func limitWrappedTextHeight(dc *gg.Context,
 		_, textH := dc.MeasureMultilineString(withBreaks, linespc)
 		return textH
 	}
-	h := textH()
-	for h > desiredH {
+	height = textH()
+	for height > desiredH {
 		face = truetype.NewFace(fontf, &truetype.Options{Size: dc.FontHeight() * 0.75})
 		dc.SetFontFace(face)
-		h = textH()
+		height = textH()
 	}
-	return face, h
+	return
 }
