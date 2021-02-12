@@ -84,7 +84,7 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 
 func (b *Bot) gifURL(gifvURL string) string {
 	switch {
-	case strings.HasPrefix(gifvURL, "https://tenor.com"):
+	case strings.HasPrefix(gifvURL, "https://tenor.com") && b.tenor != nil:
 		split := strings.Split(gifvURL, "-")
 		id := split[len(split)-1]
 		gifs, err := b.tenor.GIFs([]string{id}, tenor.MediaFilterBasic, 1)
