@@ -1,10 +1,10 @@
 package memegen
 
 import (
+	_ "embed"
 	"image"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/memegen/internal/assets"
 	"github.com/golang/freetype/truetype"
 	"github.com/samhza/gg"
 	"golang.org/x/image/font"
@@ -12,15 +12,24 @@ import (
 
 var impactFont, captionFont, timesFont *truetype.Font
 
+//go:embed assets/impact.ttf
+var impactTTF []byte
+
+//go:embed assets/caption.ttf
+var captionTTF []byte
+
+//go:embed assets/times.ttf
+var timesTTF []byte
+
 func init() {
 	var err error
-	if impactFont, err = truetype.Parse(assets.ImpactTTF); err != nil {
+	if impactFont, err = truetype.Parse(impactTTF); err != nil {
 		panic(err)
 	}
-	if captionFont, err = truetype.Parse(assets.CaptionTTF); err != nil {
+	if captionFont, err = truetype.Parse(captionTTF); err != nil {
 		panic(err)
 	}
-	if timesFont, err = truetype.Parse(assets.TimesTTF); err != nil {
+	if timesFont, err = truetype.Parse(timesTTF); err != nil {
 		panic(err)
 	}
 }
