@@ -12,11 +12,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/ff"
 	"git.sr.ht/~samhza/esammy/memegen"
 	"git.sr.ht/~samhza/esammy/tenor"
+	"git.sr.ht/~samhza/esammy/vedit"
+	"git.sr.ht/~samhza/esammy/vedit/ffmpeg"
 	"github.com/diamondburned/arikawa/v2/api"
 	"github.com/diamondburned/arikawa/v2/bot"
 	"github.com/diamondburned/arikawa/v2/discord"
@@ -31,13 +33,12 @@ type Bot struct {
 
 	httpClient *http.Client
 	tenor      *tenor.Client
-	ff         ff.Throttler
 }
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
 
-func New(client *http.Client, tenorkey string, ff ff.Throttler) *Bot {
-	b := Bot{Ctx: nil, httpClient: client, tenor: nil, ff: ff}
+func New(client *http.Client, tenorkey string) *Bot {
+	b := Bot{Ctx: nil, httpClient: client, tenor: nil}
 	if tenorkey != "" {
 		b.tenor = tenor.NewClient(tenorkey)
 		b.tenor.Client = client
@@ -73,106 +74,44 @@ func (m *MemeArguments) CustomParse(args string) error {
 	return nil
 }
 
-func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) (*api.SendMessageData, error) {
+func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) error {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
 		return memegen.Impact(w, h, args.Top, args.Bottom),
 			image.Point{}, false
 	})
 }
 
-func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) (*api.SendMessageData, error) {
+func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) error {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
 		img, pt := memegen.Caption(w, h, string(raw))
 		return img, pt, true
 	})
 }
 
-func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) (*api.SendMessageData, error) {
+func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) error {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
 		img, pt := memegen.Motivate(w, h, args.Top, args.Bottom)
 		return img, pt, true
 	})
 }
 
-func (bot *Bot) Speed(m *gateway.MessageCreateEvent, speed ...float64) (*api.SendMessageData, error) {
-	outputformat := ""
-	media, err := bot.findMedia(m.Message)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := bot.httpClient.Get(media.URL)
-	if err != nil {
-		return nil, err
-	}
-	mime := resp.Header.Get("Content-Type")
-	if mime == "image/gif" {
-		outputformat = "gif"
-	} else if strings.HasPrefix(mime, "video") {
-		if media.GIFV {
-			outputformat = "gif"
-		} else {
-			outputformat = "mp4"
-		}
-	} else {
-		resp.Body.Close()
-		return nil, errors.New("unsupported file type")
-	}
-	b := resp.Body
-	tmp, err := ioutil.TempFile("", "esammy.*")
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating temporary file")
-	}
-	defer os.Remove(tmp.Name())
-	io.Copy(tmp, b)
-	b.Close()
-	setpts := 0.5
-	if len(speed) != 0 {
-		setpts = 1.0 / speed[0]
-	}
-	gif, err := bot.ff.Speed(tmp.Name(), outputformat, setpts)
-	if err != nil {
-		return nil, err
-	}
-	r := bytes.NewReader(gif)
-	meme := sendpart.File{Name: "out." + outputformat, Reader: r}
-	return &api.SendMessageData{
-		Files: []sendpart.File{meme},
-	}, nil
-}
-
-func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMessageData, error) {
-	img := false
-	outputformat := ""
+func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 	media, err := bot.findMedia(m)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	resp, err := bot.httpClient.Get(media.URL)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	mime := resp.Header.Get("Content-Type")
-	if mime == "image/gif" {
-		outputformat = "gif"
-	} else if strings.HasPrefix(mime, "image") {
-		img = true
-	} else if strings.HasPrefix(mime, "video") {
-		if media.GIFV {
-			outputformat = "gif"
-		} else {
-			outputformat = "mp4"
-		}
-	} else {
-		resp.Body.Close()
-		return nil, errors.New("unsupported file type")
-	}
+	defer resp.Body.Close()
 	b := resp.Body
 	var meme sendpart.File
-	if img {
+	if media.Type == mediaImage {
 		img, _, err := image.Decode(b)
 		b.Close()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		width, height := img.Bounds().Max.X, img.Bounds().Max.Y
 		overlay, pt, under := imgfn(width, height)
@@ -191,41 +130,87 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) (*api.SendMess
 			png.Encode(w, dest)
 			w.Close()
 		}()
-		if err != nil {
-			return nil, err
-		}
 		meme = sendpart.File{Name: "out.png", Reader: r}
 	} else {
 		tmp, err := ioutil.TempFile("", "esammy.*")
 		if err != nil {
-			return nil, errors.Wrap(err, "error creating temporary file")
+			return errors.Wrap(err, "error creating temporary file")
 		}
 		defer os.Remove(tmp.Name())
-		io.Copy(tmp, b)
+		_, err = io.Copy(tmp, b)
+		if err != nil {
+			return errors.Wrap(err, "error downloading input")
+		}
+		tmp.Close()
 		b.Close()
-		size, _, err := bot.ff.Probe(tmp.Name())
-		if err != nil {
-			return nil, errors.Wrap(err, "error probing input")
-		}
-		img, pt, under := imgfn(size.Width, size.Height)
-		gif, err := bot.ff.Composite(tmp.Name(), outputformat, img, under, pt)
-		if err != nil {
-			return nil, err
-		}
-		r := bytes.NewReader(gif)
-		meme = sendpart.File{Name: "out." + outputformat, Reader: r}
-	}
-	return &api.SendMessageData{
-		Files: []sendpart.File{meme},
-	}, nil
-}
 
-func probeGIF(path string) (w, h int, err error) {
-	size, _, err := ff.Probe(path)
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "Failed to parse GIF")
+		input := ffmpeg.Input{Name: tmp.Name()}
+		v, a := ffmpeg.Video(input), ffmpeg.Audio(input)
+
+		img, pt, under := imgfn(media.Width, media.Height)
+		pR, pW, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		defer pW.Close()
+		enc := png.Encoder{CompressionLevel: png.NoCompression}
+		go func() {
+			enc.Encode(pW, img)
+			pW.Close()
+		}()
+		imginput := ffmpeg.InputFile{File: pR}
+		if under {
+			v = ffmpeg.Overlay(imginput, input, -pt.X, -pt.Y)
+		} else {
+			v = ffmpeg.Overlay(input, imginput, -pt.X, -pt.Y)
+		}
+		if media.Type == mediaGIFV || media.Type == mediaGIF {
+			one, two := ffmpeg.Split(v)
+			palette := ffmpeg.PaletteGen(two)
+			v = ffmpeg.PaletteUse(one, palette)
+		}
+		outfd, err := os.CreateTemp("", "esammy.*")
+		if err != nil {
+			return err
+		}
+		outfd.Close()
+		out := outfd.Name()
+		defer os.Remove(out)
+		fcmd := &ffmpeg.Cmd{}
+		var format string
+		streams := []ffmpeg.Stream{v}
+		switch media.Type {
+		case mediaVideo:
+			format = "mp4"
+			streams = append(streams, a)
+		case mediaGIFV, mediaGIF:
+			format = "gif"
+		}
+		outopts := []string{"-f", format, "-shortest"}
+		fcmd.AddFileOutput(out, outopts, streams...)
+		cmd := fcmd.Cmd()
+		cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
+		stderr := &bytes.Buffer{}
+		cmd.Stderr = stderr
+		err = cmd.Run()
+		if err != nil {
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				return fmt.Errorf("exit status %d: %s",
+					exitError.ExitCode(), string(stderr.String()))
+			}
+			return err
+		}
+		outfd, err = os.Open(out)
+		if err != nil {
+			return err
+		}
+		defer outfd.Close()
+		meme = sendpart.File{Name: "out." + format, Reader: outfd}
+
 	}
-	return size.Width, size.Height, nil
+	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{Files: []sendpart.File{meme}})
+	return err
 }
 
 func makeDrawable(img image.Image) draw.Image {
@@ -236,4 +221,10 @@ func makeDrawable(img image.Image) draw.Image {
 	} else {
 		return drawer
 	}
+}
+
+type editArguments vedit.Arguments
+
+func (e *editArguments) CustomParse(arg string) error {
+	return (*vedit.Arguments)(e).Parse(arg)
 }

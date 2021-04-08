@@ -5,13 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"time"
 
 	"git.sr.ht/~emersion/go-scfg"
 	"git.sr.ht/~samhza/esammy"
-	"git.sr.ht/~samhza/esammy/ff"
 	"github.com/diamondburned/arikawa/v2/bot"
 )
 
@@ -35,7 +33,6 @@ func main() {
 	var token, tenor string
 	var prefixes []string
 	httpClient := &http.Client{Timeout: 30 * time.Second}
-	ffThrottler := ff.NewThrottler(int64(runtime.GOMAXPROCS(-1) * 2))
 	for _, d := range config {
 		var err error
 		switch d.Name {
@@ -54,22 +51,13 @@ func main() {
 				break
 			}
 			httpClient.Timeout = time.Duration(timeout) * time.Millisecond
-		case "max-ffmpeg-processes":
-			var maxProcStr string
-			err = d.ParseParams(&maxProcStr)
-			var maxProc int64
-			maxProc, err = strconv.ParseInt(maxProcStr, 10, 64)
-			if err != nil {
-				log.Fatalln("error parsing config file:", err)
-			}
-			ffThrottler = ff.NewThrottler(maxProc)
 		}
 		if err != nil {
 			log.Fatalf("failed to load config: %v\n", err)
 		}
 	}
 
-	esammy := esammy.New(httpClient, tenor, ffThrottler)
+	esammy := esammy.New(httpClient, tenor)
 	wait, err := bot.Start(token, esammy, func(ctx *bot.Context) error {
 		ctx.HasPrefix = bot.NewPrefix(prefixes...)
 		ctx.SilentUnknown.Command = true

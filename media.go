@@ -1,6 +1,8 @@
 package esammy
 
 import (
+	"mime"
+	"path"
 	"strings"
 
 	"git.sr.ht/~samhza/esammy/tenor"
@@ -12,8 +14,17 @@ type Media struct {
 	URL    string
 	Height int
 	Width  int
-	GIFV   bool
+	Type   mediaType
 }
+
+type mediaType int
+
+const (
+	mediaImage mediaType = iota
+	mediaVideo
+	mediaGIFV
+	mediaGIF
+)
 
 func (b *Bot) findMedia(m discord.Message) (*Media, error) {
 	media := b.getMsgMedia(m)
@@ -44,11 +55,22 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 		if at.Height == 0 {
 			continue
 		}
-		return &Media{
+		m := &Media{
 			URL:    at.Proxy,
 			Height: int(at.Height),
 			Width:  int(at.Width),
 		}
+		ext := path.Ext(at.URL)
+		mime := mime.TypeByExtension(ext)
+		switch {
+		case mime == "image/gif":
+			m.Type = mediaGIF
+		case strings.HasPrefix(mime, "video/"):
+			m.Type = mediaVideo
+		case strings.HasPrefix(mime, "image/"):
+			m.Type = mediaImage
+		}
+		return m
 	}
 	for _, em := range m.Embeds {
 		if em.Type == discord.VideoEmbed && em.Provider == nil {
@@ -56,6 +78,7 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 				URL:    em.Video.URL,
 				Height: int(em.Video.Height),
 				Width:  int(em.Video.Width),
+				Type:   mediaVideo,
 			}
 		}
 		if em.Type == discord.ImageEmbed {
@@ -63,20 +86,21 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 				URL:    em.Thumbnail.Proxy,
 				Height: int(em.Thumbnail.Height),
 				Width:  int(em.Thumbnail.Width),
+				Type:   mediaImage,
 			}
 		}
 		if em.Type == discord.GIFVEmbed {
-			m := Media{
+			m := &Media{
 				Height: int(em.Video.Height),
 				Width:  int(em.Video.Width),
+				URL:    em.Video.URL,
+				Type:   mediaGIFV,
 			}
-			if url := b.gifURL(em.URL); url != "" {
-				m.URL = url
-			} else {
-				m.URL = em.Video.URL
-				m.GIFV = true
+			if gif := b.gifURL(em.Video.URL); gif != "" {
+				m.URL = gif
+				m.Type = mediaGIF
 			}
-			return &m
+			return m
 		}
 	}
 	return nil
