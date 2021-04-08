@@ -228,3 +228,48 @@ type editArguments vedit.Arguments
 func (e *editArguments) CustomParse(arg string) error {
 	return (*vedit.Arguments)(e).Parse(arg)
 }
+
+func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
+	args := (vedit.Arguments)(cmd)
+	media, err := bot.findMedia(m.Message)
+	if err != nil {
+		return err
+	}
+	var itype vedit.InputType
+	switch media.Type {
+	case mediaImage, mediaGIF:
+		itype = vedit.InputImage
+	case mediaVideo, mediaGIFV:
+		itype = vedit.InputVideo
+	}
+	resp, err := bot.httpClient.Get(media.URL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	tmp, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return err
+	}
+	defer tmp.Close()
+	_, err = io.Copy(tmp, resp.Body)
+	if err != nil {
+		return err
+	}
+	tmp.Close()
+	resp.Body.Close()
+	outname, err := vedit.Process(args, itype, tmp.Name())
+	if err != nil {
+		return err
+	}
+	defer os.Remove(outname)
+	out, err := os.Open(outname)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
+		Files: []sendpart.File{{"out.mp4", out}},
+	})
+	return err
+}
