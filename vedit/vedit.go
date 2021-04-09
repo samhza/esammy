@@ -10,22 +10,29 @@ import (
 	"strconv"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/vedit/ffmpeg"
+	ff "git.sr.ht/~samhza/esammy/vedit/ffmpeg"
 )
 
 type Arguments struct {
-	length     int
-	mute       bool
-	reverse    bool
-	vibrato    bool
-	start      float64
-	end        float64
-	music      string
-	musicskip  float64
-	musicdelay float64
-	volume     *float64
-	speed      *float64
-	skip       *float64
+	length       int
+	spin         int
+	mute         bool
+	reverse      bool
+	areverse     bool
+	vreverse     bool
+	vibrato      bool
+	start        float64
+	end          float64
+	music        string
+	musicskip    float64
+	musicdelay   float64
+	volume       *float64
+	speed        *float64
+	skip         *float64
+	fadein       float64
+	fadeinstart  float64
+	fadeout      float64
+	fadeoutstart float64
 }
 
 func parseTimestamp(str string) (float64, error) {
@@ -80,6 +87,10 @@ func (v *Arguments) Parse(args string) error {
 			v.mute = true
 		case "reverse":
 			v.reverse = true
+		case "areverse":
+			v.areverse = true
+		case "vreverse":
+			v.vreverse = true
 		case "vibrato":
 			v.vibrato = true
 		case "music":
@@ -100,8 +111,19 @@ func (v *Arguments) Parse(args string) error {
 			v.musicdelay, err = parseTimestamp(arg)
 		case "length":
 			v.length, err = strconv.Atoi(arg)
+		case "fadein":
+			v.fadein, err = strconv.ParseFloat(arg, 64)
+		case "fadeinstart":
+			v.fadeinstart, err = parseTimestamp(arg)
+		case "fadeout":
+			v.fadein, err = strconv.ParseFloat(arg, 64)
+		case "fadeoutstart":
+			v.fadeoutstart, err = parseTimestamp(arg)
+		default:
+			err = errors.New("unknown command")
 		}
 		if err != nil {
+			err = fmt.Errorf("parsing command \"%s\": %w", cmd, err)
 			break
 		}
 		cmds = cmds[1:]
@@ -117,20 +139,20 @@ const (
 )
 
 func Process(arg Arguments, itype InputType, filename string) (string, error) {
-	var v, a ffmpeg.Stream
-	instream := ffmpeg.Input{Name: filename}
+	var v, a ff.Stream
+	instream := ff.Input{Name: filename}
 	if itype == InputImage {
 		instream.Options = []string{"-stream_loop", "-1"}
-		v, a = ffmpeg.Video(instream), ffmpeg.Audio(instream)
-		v = ffmpeg.Filter(v,
+		v, a = ff.Video(instream), ff.Audio(instream)
+		v = ff.Filter(v,
 			"pad=ceil(iw/2)*2:ceil(ih/2)*2,trim=duration="+strconv.Itoa(arg.length))
-		a = ffmpeg.Filter(ffmpeg.ANullSrc,
+		a = ff.Filter(ff.ANullSrc,
 			"atrim=duration="+strconv.Itoa(arg.length))
 	} else {
-		v, a = ffmpeg.Video(instream), ffmpeg.Audio(instream)
+		v, a = ff.Video(instream), ff.Audio(instream)
 	}
 	if arg.mute {
-		a = ffmpeg.Volume(a, 0)
+		a = ff.Volume(a, 0)
 	}
 	var trim []string
 	if arg.start > 0 {
@@ -140,17 +162,19 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		trim = append(trim, fmt.Sprintf("end=%f", arg.end))
 	}
 	if len(trim) > 0 {
-		a = ffmpeg.Filter(a, "atrim="+strings.Join(trim, ":"))
-		v = ffmpeg.Filter(v, "trim="+strings.Join(trim, ":"))
-		a = ffmpeg.Filter(a, "asetpts=PTS-STARTPTS")
-		v = ffmpeg.Filter(v, "setpts=PTS-STARTPTS")
+		a = ff.Filter(a, "atrim="+strings.Join(trim, ":"))
+		v = ff.Filter(v, "trim="+strings.Join(trim, ":"))
+		a = ff.Filter(a, "asetpts=PTS-STARTPTS")
+		v = ff.Filter(v, "setpts=PTS-STARTPTS")
 	}
-	if arg.reverse {
-		a = ffmpeg.Filter(a, "areverse")
-		v = ffmpeg.Filter(v, "reverse")
+	if arg.reverse || arg.areverse {
+		a = ff.Filter(a, "areverse")
+	}
+	if arg.reverse || arg.vreverse {
+		v = ff.Filter(v, "reverse")
 	}
 	if arg.vibrato {
-		a = ffmpeg.Filter(a, "vibrato")
+		a = ff.Filter(a, "vibrato")
 	}
 	if arg.music != "" {
 		music, err := downloadMusic(arg.music)
@@ -160,36 +184,52 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		mus := ffmpeg.Audio(ffmpeg.Input{Name: music})
+		mus := ff.Audio(ff.Input{Name: music})
 		if arg.musicskip > 0 {
-			mus = ffmpeg.Filter(mus, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicskip))
+			mus = ff.Filter(mus, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicskip))
 		}
 		if arg.musicdelay > 0 {
-			part1, part2 := ffmpeg.ASplit(a)
-			part1 = ffmpeg.Filter(part1, fmt.Sprintf("atrim=end=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
-			part2 = ffmpeg.Filter(part2, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
-			part2 = ffmpeg.AMix(mus, part2)
-			a = ffmpeg.Concat(0, 1, part1, part2)[0]
+			part1, part2 := ff.ASplit(a)
+			part1 = ff.Filter(part1, fmt.Sprintf("atrim=end=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
+			part2 = ff.Filter(part2, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
+			part2 = ff.AMix(mus, part2)
+			a = ff.Concat(0, 1, part1, part2)[0]
 		} else {
-			a = ffmpeg.AMix(mus, a)
+			a = ff.AMix(mus, a)
 		}
 	}
 	if arg.speed != nil {
-		v = ffmpeg.MultiplyPTS(v, float64(1) / *arg.speed)
-		a = ffmpeg.ATempo(a, *arg.speed)
+		v = ff.MultiplyPTS(v, float64(1) / *arg.speed)
+		a = ff.ATempo(a, *arg.speed)
 	}
 	if arg.volume != nil {
-		a = ffmpeg.Volume(a, *arg.volume)
+		a = ff.Volume(a, *arg.volume)
 	}
-
+	if arg.spin > 0 {
+		v = ff.Filter(v, "rotate=t*"+strconv.Itoa(arg.spin))
+	}
+	if arg.fadein > 0 || arg.fadeinstart > 0 {
+		fadein := arg.fadein
+		if fadein == 0 {
+			fadein = 5
+		}
+		v = ff.Filter(v, fmt.Sprintf("fade=in:duration=%f:start_time=%f", fadein, arg.fadeinstart))
+	}
+	if arg.fadeout > 0 || arg.fadeoutstart > 0 {
+		fadeout := arg.fadeout
+		if fadeout == 0 {
+			fadeout = 5
+		}
+		v = ff.Filter(v, fmt.Sprintf("fade=out:duration=%f:start_time=%f", fadeout, arg.fadeoutstart))
+	}
 	f, err := os.CreateTemp("", "esammy.*")
 	if err != nil {
 		return "", err
 	}
 	f.Close()
-	fcmd := &ffmpeg.Cmd{}
+	fcmd := &ff.Cmd{}
 	outopts := []string{"-f", "mp4", "-shortest"}
-	if itype == InputVideo && ffmpeg.IsInputStream(v) {
+	if itype == InputVideo && ff.IsInputStream(v) {
 		outopts = append(outopts, "-c:v", "copy")
 	}
 	fcmd.AddFileOutput(f.Name(), outopts, v, a)
