@@ -55,20 +55,12 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 		if at.Height == 0 {
 			continue
 		}
+		ext := path.Ext(at.Proxy)
 		m := &Media{
 			URL:    at.Proxy,
 			Height: int(at.Height),
 			Width:  int(at.Width),
-		}
-		ext := path.Ext(at.URL)
-		mime := mime.TypeByExtension(ext)
-		switch {
-		case mime == "image/gif":
-			m.Type = mediaGIF
-		case strings.HasPrefix(mime, "video/"):
-			m.Type = mediaVideo
-		case strings.HasPrefix(mime, "image/"):
-			m.Type = mediaImage
+			Type:   mediaTypeByExt(ext),
 		}
 		return m
 	}
@@ -82,12 +74,13 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 			}
 		}
 		if em.Type == discord.ImageEmbed {
-			return &Media{
+			m := &Media{
 				URL:    em.Thumbnail.Proxy,
 				Height: int(em.Thumbnail.Height),
 				Width:  int(em.Thumbnail.Width),
-				Type:   mediaImage,
 			}
+			m.Type = mediaTypeByExt(path.Ext(m.URL))
+			return m
 		}
 		if em.Type == discord.GIFVEmbed {
 			m := &Media{
@@ -104,6 +97,19 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 		}
 	}
 	return nil
+}
+
+func mediaTypeByExt(ext string) mediaType {
+	mime := mime.TypeByExtension(ext)
+	switch {
+	case mime == "image/gif":
+		return mediaGIF
+	case strings.HasPrefix(mime, "video/"):
+		return mediaVideo
+	case strings.HasPrefix(mime, "image/"):
+		return mediaImage
+	}
+	return mediaImage
 }
 
 func (b *Bot) gifURL(gifvURL string) string {
