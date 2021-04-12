@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"git.sr.ht/~samhza/esammy/memegen"
+	"git.sr.ht/~samhza/esammy/vedit/ffmpeg"
 	ff "git.sr.ht/~samhza/esammy/vedit/ffmpeg"
 )
 
@@ -33,6 +37,8 @@ type Arguments struct {
 	fadeinstart  float64
 	fadeout      float64
 	fadeoutstart float64
+	tt, bt       string
+	cap          string
 }
 
 func parseTimestamp(str string) (float64, error) {
@@ -111,6 +117,8 @@ func (v *Arguments) Parse(args string) error {
 			v.musicdelay, err = parseTimestamp(arg)
 		case "length":
 			v.length, err = strconv.Atoi(arg)
+		case "spin":
+			v.spin, err = strconv.Atoi(arg)
 		case "fadein":
 			v.fadein, err = strconv.ParseFloat(arg, 64)
 		case "fadeinstart":
@@ -119,6 +127,12 @@ func (v *Arguments) Parse(args string) error {
 			v.fadein, err = strconv.ParseFloat(arg, 64)
 		case "fadeoutstart":
 			v.fadeoutstart, err = parseTimestamp(arg)
+		case "tt":
+			v.tt = arg
+		case "bt":
+			v.bt = arg
+		case "cap", "caption":
+			v.cap = arg
 		default:
 			err = errors.New("unknown command")
 		}
@@ -139,6 +153,10 @@ const (
 )
 
 func Process(arg Arguments, itype InputType, filename string) (string, error) {
+	width, height, err := probeSize(filename)
+	if err != nil {
+		return "", err
+	}
 	var v, a ff.Stream
 	instream := ff.Input{Name: filename}
 	if itype == InputImage {
@@ -202,6 +220,24 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		v = ff.MultiplyPTS(v, float64(1) / *arg.speed)
 		a = ff.ATempo(a, *arg.speed)
 	}
+	if arg.tt != "" || arg.bt != "" {
+		image := memegen.Impact(width, height, arg.tt, arg.bt)
+		imginput, cancel, err := imageInput(image)
+		if err != nil {
+			return "", err
+		}
+		defer cancel()
+		v = ffmpeg.Overlay(v, imginput, 0, 0)
+	}
+	if arg.cap != "" {
+		image, pt := memegen.Caption(width, height, arg.cap)
+		imginput, cancel, err := imageInput(image)
+		if err != nil {
+			return "", err
+		}
+		defer cancel()
+		v = ffmpeg.Overlay(imginput, v, -pt.X, -pt.Y)
+	}
 	if arg.volume != nil {
 		a = ff.Volume(a, *arg.volume)
 	}
@@ -247,6 +283,57 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		return "", err
 	}
 	return f.Name(), nil
+}
+
+func imageInput(img image.Image) (stream ffmpeg.Stream, cancel func(), err error) {
+	pR, pW, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	enc := png.Encoder{CompressionLevel: png.NoCompression}
+	go func() {
+		enc.Encode(pW, img)
+		pW.Close()
+	}()
+	imginput := ffmpeg.InputFile{File: pR}
+	return imginput, func() { pR.Close() }, nil
+}
+
+func probeSize(path string) (width, height int, err error) {
+	cmd := exec.Command(
+		"ffprobe",
+		"-v", "quiet",
+		"-read_intervals", "%+#1", // 1 frame only
+		"-select_streams", "v:0",
+		"-print_format", "default=noprint_wrappers=1",
+		"-show_entries", "stream=width,height", path,
+	)
+
+	b, err := cmd.Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("Failed to execute FFprobe", err)
+	}
+
+	for _, t := range bytes.Fields(b) {
+		p := bytes.Split(t, []byte("="))
+		if len(p) != 2 {
+			return 0, 0, fmt.Errorf("invalid line: %q", t)
+		}
+		v := strings.Split(string(p[1]), "/")[0]
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to parse int from line %q: %w", t, err)
+		}
+
+		switch string(p[0]) {
+		case "width":
+			width = i
+		case "height":
+			height = i
+		}
+	}
+
+	return width, height, nil
 }
 
 func downloadMusic(music string) (string, error) {
