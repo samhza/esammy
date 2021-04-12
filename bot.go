@@ -237,9 +237,9 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	}
 	var itype vedit.InputType
 	switch media.Type {
-	case mediaImage, mediaGIF:
+	case mediaImage, mediaGIF, mediaGIFV:
 		itype = vedit.InputImage
-	case mediaVideo, mediaGIFV:
+	case mediaVideo:
 		itype = vedit.InputVideo
 	}
 	resp, err := bot.httpClient.Get(media.URL)
