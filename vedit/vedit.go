@@ -256,8 +256,12 @@ func downloadMusic(music string) (string, error) {
 	}
 	f.Close()
 	cmd := exec.Command("youtube-dl",
+		"--max-filesize", "10m",
 		"--default-search", "ytsearch",
-		"--no-continue", "-f", "249,250,251", "-o", f.Name(), music)
+		"-f", "[filesize<10M]249,250,251",
+		"--no-continue",
+		"-o", f.Name(),
+		music)
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
