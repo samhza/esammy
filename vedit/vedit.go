@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/memegen"
-	"git.sr.ht/~samhza/esammy/vedit/ffmpeg"
-	ff "git.sr.ht/~samhza/esammy/vedit/ffmpeg"
+	"samhza.com/esammy/memegen"
+	"samhza.com/esammy/vedit/ffmpeg"
+	ff "samhza.com/esammy/vedit/ffmpeg"
 )
 
 type Arguments struct {

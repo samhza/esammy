@@ -15,10 +15,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/memegen"
-	"git.sr.ht/~samhza/esammy/tenor"
-	"git.sr.ht/~samhza/esammy/vedit"
-	"git.sr.ht/~samhza/esammy/vedit/ffmpeg"
 	"github.com/diamondburned/arikawa/v2/api"
 	"github.com/diamondburned/arikawa/v2/bot"
 	"github.com/diamondburned/arikawa/v2/discord"
@@ -26,6 +22,10 @@ import (
 	"github.com/diamondburned/arikawa/v2/utils/sendpart"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
+	"samhza.com/esammy/memegen"
+	"samhza.com/esammy/tenor"
+	"samhza.com/esammy/vedit"
+	"samhza.com/esammy/vedit/ffmpeg"
 )
 
 type Bot struct {

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"git.sr.ht/~emersion/go-scfg"
-	"git.sr.ht/~samhza/esammy"
 	"github.com/diamondburned/arikawa/v2/bot"
+	"samhza.com/esammy"
 )
 
 func init() {

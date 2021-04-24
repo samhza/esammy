@@ -5,9 +5,9 @@ import (
 	"path"
 	"strings"
 
-	"git.sr.ht/~samhza/esammy/tenor"
 	"github.com/diamondburned/arikawa/v2/discord"
 	"github.com/pkg/errors"
+	"samhza.com/esammy/tenor"
 )
 
 type Media struct {
