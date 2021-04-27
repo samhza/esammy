@@ -165,6 +165,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			v = ffmpeg.Overlay(input, imginput, -pt.X, -pt.Y)
 		}
 		if media.Type == mediaGIFV || media.Type == mediaGIF {
+			v = ffmpeg.Filter(v, "fps=20")
 			one, two := ffmpeg.Split(v)
 			palette := ffmpeg.PaletteGen(two)
 			v = ffmpeg.PaletteUse(one, palette)
