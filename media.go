@@ -7,7 +7,7 @@ import (
 
 	"github.com/diamondburned/arikawa/v2/discord"
 	"github.com/pkg/errors"
-	"samhza.com/esammy/tenor"
+	"go.samhza.com/esammy/tenor"
 )
 
 type Media struct {

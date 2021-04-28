@@ -22,10 +22,10 @@ import (
 	"github.com/diamondburned/arikawa/v2/utils/sendpart"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"samhza.com/esammy/memegen"
-	"samhza.com/esammy/tenor"
-	"samhza.com/esammy/vedit"
-	"samhza.com/esammy/vedit/ffmpeg"
+	"go.samhza.com/esammy/memegen"
+	"go.samhza.com/esammy/tenor"
+	"go.samhza.com/esammy/vedit"
+	"go.samhza.com/esammy/vedit/ffmpeg"
 )
 
 type Bot struct {

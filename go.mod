@@ -1,4 +1,4 @@
-module samhza.com/esammy
+module go.samhza.com/esammy
 
 go 1.16
 
