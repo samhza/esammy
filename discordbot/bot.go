@@ -1,4 +1,4 @@
-package esammy
+package discordbot
 
 import (
 	"bytes"

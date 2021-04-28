@@ -10,7 +10,7 @@ import (
 
 	"git.sr.ht/~emersion/go-scfg"
 	"github.com/diamondburned/arikawa/v2/bot"
-	"go.samhza.com/esammy"
+	"go.samhza.com/esammy/discordbot"
 )
 
 func init() {
@@ -57,8 +57,8 @@ func main() {
 		}
 	}
 
-	esammy := esammy.New(httpClient, tenor)
-	wait, err := bot.Start(token, esammy, func(ctx *bot.Context) error {
+	dbot := discordbot.New(httpClient, tenor)
+	wait, err := bot.Start(token, dbot, func(ctx *bot.Context) error {
 		ctx.HasPrefix = bot.NewPrefix(prefixes...)
 		ctx.SilentUnknown.Command = true
 		return nil
