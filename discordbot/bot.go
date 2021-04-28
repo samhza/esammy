@@ -25,7 +25,7 @@ import (
 	"go.samhza.com/esammy/memegen"
 	"go.samhza.com/esammy/tenor"
 	"go.samhza.com/esammy/vedit"
-	"go.samhza.com/esammy/vedit/ffmpeg"
+	"go.samhza.com/ffmpeg"
 )
 
 type Bot struct {

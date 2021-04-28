@@ -13,8 +13,7 @@ import (
 	"strings"
 
 	"go.samhza.com/esammy/memegen"
-	"go.samhza.com/esammy/vedit/ffmpeg"
-	ff "go.samhza.com/esammy/vedit/ffmpeg"
+	ff "go.samhza.com/ffmpeg"
 )
 
 type Arguments struct {
@@ -227,7 +226,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 			return "", err
 		}
 		defer cancel()
-		v = ffmpeg.Overlay(v, imginput, 0, 0)
+		v = ff.Overlay(v, imginput, 0, 0)
 	}
 	if arg.cap != "" {
 		image, pt := memegen.Caption(width, height, arg.cap)
@@ -236,7 +235,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 			return "", err
 		}
 		defer cancel()
-		v = ffmpeg.Overlay(imginput, v, -pt.X, -pt.Y)
+		v = ff.Overlay(imginput, v, -pt.X, -pt.Y)
 	}
 	if arg.volume != nil {
 		a = ff.Volume(a, *arg.volume)
@@ -285,7 +284,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 	return f.Name(), nil
 }
 
-func imageInput(img image.Image) (stream ffmpeg.Stream, cancel func(), err error) {
+func imageInput(img image.Image) (stream ff.Stream, cancel func(), err error) {
 	pR, pW, err := os.Pipe()
 	if err != nil {
 		return nil, nil, err
@@ -295,7 +294,7 @@ func imageInput(img image.Image) (stream ffmpeg.Stream, cancel func(), err error
 		enc.Encode(pW, img)
 		pW.Close()
 	}()
-	imginput := ffmpeg.InputFile{File: pR}
+	imginput := ff.InputFile{File: pR}
 	return imginput, func() { pR.Close() }, nil
 }
 
