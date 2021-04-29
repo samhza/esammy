@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/jpeg"
 	"image/png"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/diamondburned/arikawa/v2/api"
@@ -25,7 +27,7 @@ import (
 	"go.samhza.com/esammy/memegen"
 	"go.samhza.com/esammy/tenor"
 	"go.samhza.com/esammy/vedit"
-	"go.samhza.com/ffmpeg"
+	ff "go.samhza.com/ffmpeg"
 )
 
 type Bot struct {
@@ -145,8 +147,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		tmp.Close()
 		b.Close()
 
-		input := ffmpeg.Input{Name: tmp.Name()}
-		v, a := ffmpeg.Video(input), ffmpeg.Audio(input)
+		input := ff.Input{Name: tmp.Name()}
+		v, a := ff.Video(input), ff.Audio(input)
 
 		img, pt, under := imgfn(media.Width, media.Height)
 		pR, pW, err := os.Pipe()
@@ -159,17 +161,17 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			enc.Encode(pW, img)
 			pW.Close()
 		}()
-		imginput := ffmpeg.InputFile{File: pR}
+		imginput := ff.InputFile{File: pR}
 		if under {
-			v = ffmpeg.Overlay(imginput, input, -pt.X, -pt.Y)
+			v = ff.Overlay(imginput, input, -pt.X, -pt.Y)
 		} else {
-			v = ffmpeg.Overlay(input, imginput, -pt.X, -pt.Y)
+			v = ff.Overlay(input, imginput, -pt.X, -pt.Y)
 		}
 		if media.Type == mediaGIFV || media.Type == mediaGIF {
-			v = ffmpeg.Filter(v, "fps=20")
-			one, two := ffmpeg.Split(v)
-			palette := ffmpeg.PaletteGen(two)
-			v = ffmpeg.PaletteUse(one, palette)
+			v = ff.Filter(v, "fps=20")
+			one, two := ff.Split(v)
+			palette := ff.PaletteGen(two)
+			v = ff.PaletteUse(one, palette)
 		}
 		outfd, err := os.CreateTemp("", "esammy.*")
 		if err != nil {
@@ -178,9 +180,9 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		outfd.Close()
 		out := outfd.Name()
 		defer os.Remove(out)
-		fcmd := &ffmpeg.Cmd{}
+		fcmd := &ff.Cmd{}
 		var format string
-		streams := []ffmpeg.Stream{v}
+		streams := []ff.Stream{v}
 		switch media.Type {
 		case mediaVideo:
 			format = "mp4"
@@ -275,3 +277,147 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	})
 	return err
 }
+
+func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
+	media, err := bot.findMedia(m.Message)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Get(media.URL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var newMinY int
+	if media.Type == mediaImage {
+		im, _, err := image.Decode(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return err
+		}
+		var found bool
+		newMinY, found = detectCaption(im)
+		if !found {
+			return errors.New("couldn't find the caption")
+		}
+		b := im.Bounds()
+		b.Min.Y = newMinY
+		cropped := croppedImage{im, b}
+		r, w := io.Pipe()
+		defer r.Close()
+		go func() {
+			png.Encode(w, cropped)
+			w.Close()
+		}()
+		_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
+			Files: []sendpart.File{{"out.png", r}},
+		})
+		return err
+	}
+	in, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return err
+	}
+	inputf := in.Name()
+	defer os.Remove(inputf)
+	defer in.Close()
+	_, err = io.Copy(in, resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil
+	}
+	var firstFrame image.Image
+	if media.Type == mediaGIF {
+		_, err = in.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		firstFrame, _, err = image.Decode(in)
+		if err != nil {
+			return err
+		}
+		in.Close()
+	} else {
+		in.Close()
+		firstFrame, err = firstVidFrame(inputf)
+		if err != nil {
+			return err
+		}
+	}
+	newMinY, found := detectCaption(firstFrame)
+	if !found {
+		return errors.New("couldn't find the caption")
+	}
+	var v ff.Stream = ff.Input{Name: inputf}
+	b := firstFrame.Bounds()
+	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
+		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
+	var outformat string
+	switch media.Type {
+	case mediaGIFV, mediaGIF:
+		v = ff.Filter(v, "fps=20")
+		one, two := ff.Split(v)
+		palette := ff.PaletteGen(two)
+		v = ff.PaletteUse(one, palette)
+		outformat = "gif"
+	default:
+		outformat = "mp4"
+	}
+	out, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(out.Name())
+	out.Close()
+	fcmd := new(ff.Cmd)
+	fcmd.AddFileOutput(out.Name(), []string{"-y", "-f", outformat}, v)
+	err = fcmd.Cmd().Run()
+	if err != nil {
+		return err
+	}
+	out, err = os.Open(out.Name())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
+		Files: []sendpart.File{{"out." + outformat, out}},
+	})
+	return err
+}
+
+func firstVidFrame(filename string) (image.Image, error) {
+	var v ff.Stream = ff.Input{Name: filename}
+	v = ff.Filter(v, "select=eq(n\\,0)")
+	cmd := new(ff.Cmd)
+	cmd.AddFileOutput("-", []string{"-f", "mjpeg"}, v)
+	out, err := cmd.Cmd().Output()
+	if err != nil {
+		return nil, err
+	}
+	img, _, err := image.Decode(bytes.NewReader(out))
+	return img, err
+}
+
+func detectCaption(m image.Image) (newMinY int, found bool) {
+	b := m.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		brightness := color.GrayModel.Convert(m.At(b.Min.X, y)).(color.Gray).Y
+		if brightness < 250 {
+			if y == b.Min.Y {
+				return 0, false
+			}
+			return y, true
+		}
+	}
+	return 0, false
+}
+
+type croppedImage struct {
+	image  image.Image
+	bounds image.Rectangle
+}
+
+func (c croppedImage) ColorModel() color.Model { return c.image.ColorModel() }
+func (c croppedImage) At(x, y int) color.Color { return c.image.At(x, y) }
+func (c croppedImage) Bounds() image.Rectangle { return c.bounds }
