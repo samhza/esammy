@@ -97,6 +97,58 @@ func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) erro
 	})
 }
 
+func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
+	media, err := bot.findMedia(m.Message)
+	if err != nil {
+		return err
+	}
+	if media.Type != mediaVideo {
+		return errors.New("this isn't a video")
+	}
+	resp, err := http.Get(media.URL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	in, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(in.Name())
+	_, err = io.Copy(in, resp.Body)
+	in.Close()
+	resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	var v ff.Stream = ff.Video(ff.Input{Name: in.Name()})
+	v = ff.Filter(v, "fps=20")
+	one, two := ff.Split(v)
+	palette := ff.PaletteGen(two)
+	v = ff.PaletteUse(one, palette)
+	fcmd := new(ff.Cmd)
+	out, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(out.Name())
+	out.Close()
+	fcmd.AddFileOutput(out.Name(), []string{"-y", "-f", "gif"}, v)
+	err = fcmd.Cmd().Run()
+	if err != nil {
+		return err
+	}
+	out, err = os.Open(out.Name())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
+		Files: []sendpart.File{{Name: "out.gif", Reader: out}},
+	})
+	return err
+}
+
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 	media, err := bot.findMedia(m)
 	if err != nil {
