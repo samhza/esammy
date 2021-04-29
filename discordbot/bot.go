@@ -126,6 +126,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		}
 		draw.Draw(dest, dest.Bounds(), src, pt, draw.Over)
 		r, w := io.Pipe()
+		defer r.Close()
 		go func() {
 			png.Encode(w, dest)
 			w.Close()
