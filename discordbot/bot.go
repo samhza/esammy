@@ -273,7 +273,7 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	}
 	defer out.Close()
 	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-		Files: []sendpart.File{{"out.mp4", out}},
+		Files: []sendpart.File{{Name: "out.mp4", Reader: out}},
 	})
 	return err
 }
@@ -310,7 +310,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			w.Close()
 		}()
 		_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-			Files: []sendpart.File{{"out.png", r}},
+			Files: []sendpart.File{{Name: "out.png", Reader: r}},
 		})
 		return err
 	}
@@ -381,7 +381,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	}
 	defer out.Close()
 	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-		Files: []sendpart.File{{"out." + outformat, out}},
+		Files: []sendpart.File{{Name: "out." + outformat, Reader: out}},
 	})
 	return err
 }
