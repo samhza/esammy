@@ -45,6 +45,9 @@ func main() {
 		case "http-timeout":
 			var timeoutStr string
 			err = d.ParseParams(&timeoutStr)
+			if err != nil {
+				break
+			}
 			var timeout int
 			timeout, err = strconv.Atoi(timeoutStr)
 			if err != nil {
