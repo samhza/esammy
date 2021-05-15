@@ -10,6 +10,6 @@ Discord bot made for friends to make memes with.
 
 Install with `go get go.samhza.com/esammy`.
 
-See `esammy.config.example` for example config.
+See `esammy.toml.example` for example config.
 
-Run with `esammy -config path/to/esammy.config`.
+Run with `esammy -config path/to/esammy.toml`.

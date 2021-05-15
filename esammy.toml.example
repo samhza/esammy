@@ -1,0 +1,4 @@
+token = ""
+prefixes = ["&"]
+http-timeout = 30000
+tenor = ""

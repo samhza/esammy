@@ -1,9 +1,0 @@
-# discord bot token
-token NzQyNwNTU5MDAyZSjE0ygHoQuxHJoM
-# discord bot prefixes (multiple allowed)
-prefix &
-# timeout for fetching meme input (milliseconds, default 30000)
-http-timeout 30000
-# tenor api key
-# (optional, used for fetching gifs instead of mp4s from tenor)
-tenor AAAAAAAAAAAA

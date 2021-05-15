@@ -5,64 +5,45 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
-	"git.sr.ht/~emersion/go-scfg"
-	"github.com/diamondburned/arikawa/v2/bot"
 	"go.samhza.com/esammy/discordbot"
+
+	"github.com/diamondburned/arikawa/v2/bot"
+	"github.com/pelletier/go-toml"
 )
 
 func init() {
 	log.SetFlags(0)
 }
 
+type config struct {
+	Token       string   `toml:"token"`
+	Tenor       string   `toml:"tenor"`
+	HTTPTimeout int      `toml:"http-timeout" default:"30000"`
+	Prefixes    []string `toml:"prefixes"`
+}
+
 func main() {
 	var configPath string
-	flag.StringVar(&configPath, "config", "esammy.config", "Path to load config from")
+	flag.StringVar(&configPath, "config", "esammy.toml", "Path to load config from")
 	flag.Parse()
 	configFile, err := os.Open(configPath)
 	if err != nil {
 		log.Fatalln("error opening config file:", err)
 	}
-	config, err := scfg.Read(configFile)
-	if err != nil {
-		log.Fatalln("error reading config file:", err)
+	var config config
+	dec := toml.NewDecoder(configFile)
+	if err = dec.Decode(&config); err != nil {
+		log.Fatalln("error reading config:", err)
 	}
 
-	var token, tenor string
-	var prefixes []string
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	for _, d := range config {
-		var err error
-		switch d.Name {
-		case "token":
-			err = d.ParseParams(&token)
-		case "tenor":
-			err = d.ParseParams(&tenor)
-		case "prefix":
-			prefixes = d.Params
-		case "http-timeout":
-			var timeoutStr string
-			err = d.ParseParams(&timeoutStr)
-			if err != nil {
-				break
-			}
-			var timeout int
-			timeout, err = strconv.Atoi(timeoutStr)
-			if err != nil {
-				break
-			}
-			httpClient.Timeout = time.Duration(timeout) * time.Millisecond
-		}
-		if err != nil {
-			log.Fatalf("failed to load config: %v\n", err)
-		}
-	}
+	httpClient := &http.Client{
+		Timeout: time.Duration(config.HTTPTimeout) * time.Millisecond}
 
-	dbot := discordbot.New(httpClient, tenor)
-	wait, err := bot.Start(token, dbot, func(ctx *bot.Context) error {
-		ctx.HasPrefix = bot.NewPrefix(prefixes...)
+	dbot := discordbot.New(httpClient, config.Tenor)
+	wait, err := bot.Start(config.Token, dbot, func(ctx *bot.Context) error {
+		ctx.HasPrefix = bot.NewPrefix(config.Prefixes...)
 		ctx.SilentUnknown.Command = true
 		return nil
 	})
