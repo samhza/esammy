@@ -151,13 +151,13 @@ const (
 	InputImage
 )
 
-func Process(arg Arguments, itype InputType, filename string) (string, error) {
-	width, height, err := probeSize(filename)
+func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
+	width, height, err := probeSize(file)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var v, a ff.Stream
-	instream := ff.Input{Name: filename}
+	instream := ff.InputFile{File: file}
 	if itype == InputImage {
 		instream.Options = []string{"-stream_loop", "-1"}
 		v, a = ff.Video(instream), ff.Audio(instream)
@@ -199,7 +199,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 			defer os.Remove(music)
 		}
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		mus := ff.Audio(ff.Input{Name: music})
 		if arg.musicskip > 0 {
@@ -223,7 +223,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		image := memegen.Impact(width, height, arg.tt, arg.bt)
 		imginput, cancel, err := imageInput(image)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		defer cancel()
 		v = ff.Overlay(v, imginput, 0, 0)
@@ -232,7 +232,7 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 		image, pt := memegen.Caption(width, height, arg.cap)
 		imginput, cancel, err := imageInput(image)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		defer cancel()
 		v = ff.Overlay(imginput, v, -pt.X, -pt.Y)
@@ -259,29 +259,29 @@ func Process(arg Arguments, itype InputType, filename string) (string, error) {
 	}
 	f, err := os.CreateTemp("", "esammy.*")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	f.Close()
 	fcmd := &ff.Cmd{}
 	outopts := []string{"-f", "mp4", "-shortest"}
 	if itype == InputVideo && ff.IsInputStream(v) {
 		outopts = append(outopts, "-c:v", "copy")
 	}
-	fcmd.AddFileOutput(f.Name(), outopts, v, a)
+	fcmd.AddFileOutput(f, outopts, v, a)
 	cmd := fcmd.Cmd()
 	cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
+	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			return "", fmt.Errorf("exit status %d: %s",
+			return nil, fmt.Errorf("exit status %d: %s",
 				exitError.ExitCode(), string(stderr.String()))
 		}
-		return "", err
+		return nil, err
 	}
-	return f.Name(), nil
+	return f, nil
 }
 
 func imageInput(img image.Image) (stream ff.Stream, cancel func(), err error) {
@@ -298,19 +298,20 @@ func imageInput(img image.Image) (stream ff.Stream, cancel func(), err error) {
 	return imginput, func() { pR.Close() }, nil
 }
 
-func probeSize(path string) (width, height int, err error) {
+func probeSize(file *os.File) (width, height int, err error) {
 	cmd := exec.Command(
 		"ffprobe",
 		"-v", "quiet",
 		"-read_intervals", "%+#1", // 1 frame only
 		"-select_streams", "v:0",
 		"-print_format", "default=noprint_wrappers=1",
-		"-show_entries", "stream=width,height", path,
+		"-show_entries", "stream=width,height", "pipe:3",
 	)
+	cmd.ExtraFiles = []*os.File{file}
 
 	b, err := cmd.Output()
 	if err != nil {
-		return 0, 0, fmt.Errorf("Failed to execute FFprobe", err)
+		return 0, 0, fmt.Errorf("failed to execute FFprobe: %w", err)
 	}
 
 	for _, t := range bytes.Fields(b) {
