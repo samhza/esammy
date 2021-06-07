@@ -160,7 +160,7 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 	instream := ff.InputFile{File: file}
 	if itype == InputImage {
 		instream.Options = []string{"-stream_loop", "-1"}
-		v, a = ff.Video(instream), ff.Audio(instream)
+		v = ff.Video(instream)
 		v = ff.Filter(v,
 			"pad=ceil(iw/2)*2:ceil(ih/2)*2,trim=duration="+strconv.Itoa(arg.length))
 		a = ff.Filter(ff.ANullSrc,
