@@ -3,7 +3,7 @@ package tenor
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	neturl "net/url"
 	"strconv"
@@ -105,7 +105,7 @@ func (c *Client) requestJSON(method, url string, to interface{}, form interface{
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		return HTTPError{resp.StatusCode, data}
 	}
 	dec := json.NewDecoder(resp.Body)
