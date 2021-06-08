@@ -17,29 +17,29 @@ import (
 )
 
 type Arguments struct {
-	length       int
+	speed        *float64
+	volume       *float64
+	music        string
+	bt           string
+	tt           string
+	cap          string
+	fadein       float64
 	spin         int
-	mute         bool
-	reverse      bool
-	areverse     bool
-	vreverse     bool
-	vibrato      bool
-	muffle       bool
-	reverb       bool
+	fadeoutstart float64
 	start        float64
 	end          float64
-	music        string
+	fadeout      float64
 	musicskip    float64
 	musicdelay   float64
-	volume       *float64
-	speed        *float64
-	skip         *float64
-	fadein       float64
+	length       int
 	fadeinstart  float64
-	fadeout      float64
-	fadeoutstart float64
-	tt, bt       string
-	cap          string
+	areverse     bool
+	reverse      bool
+	vreverse     bool
+	reverb       bool
+	mute         bool
+	muffle       bool
+	vibrato      bool
 }
 
 func parseTimestamp(str string) (float64, error) {
@@ -283,7 +283,6 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 	cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
-	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
 		var exitError *exec.ExitError
