@@ -24,6 +24,8 @@ type Arguments struct {
 	areverse     bool
 	vreverse     bool
 	vibrato      bool
+	muffle       bool
+	reverb       bool
 	start        float64
 	end          float64
 	music        string
@@ -132,6 +134,10 @@ func (v *Arguments) Parse(args string) error {
 			v.bt = arg
 		case "cap", "caption":
 			v.cap = arg
+		case "reverb":
+			v.reverb = true
+		case "muffle":
+			v.muffle = true
 		default:
 			err = errors.New("unknown command")
 		}
@@ -214,6 +220,12 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 		} else {
 			a = ff.AMix(mus, a)
 		}
+	}
+	if arg.muffle {
+		a = ff.Filter(a, "lowpass=300")
+	}
+	if arg.reverb {
+		a = ff.Filter(a, "aecho=0.8:0.9:1000:0.1")
 	}
 	if arg.speed != nil {
 		v = ff.MultiplyPTS(v, float64(1) / *arg.speed)
