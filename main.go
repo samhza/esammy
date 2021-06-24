@@ -9,7 +9,7 @@ import (
 
 	"go.samhza.com/esammy/discordbot"
 
-	"github.com/diamondburned/arikawa/v2/bot"
+	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/pelletier/go-toml"
 )
 

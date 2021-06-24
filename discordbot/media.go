@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/diamondburned/arikawa/v2/discord"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/pkg/errors"
 	"go.samhza.com/esammy/tenor"
 )
@@ -37,7 +37,7 @@ func (b *Bot) findMedia(m discord.Message) (*Media, error) {
 			return media, nil
 		}
 	}
-	msgs, err := b.Ctx.Messages(m.ChannelID)
+	msgs, err := b.Ctx.Messages(m.ChannelID, 20)
 	if err != nil {
 		return nil, err
 	}
