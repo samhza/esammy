@@ -8,7 +8,6 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	"image/png"
-	_ "image/png"
 	"io"
 	"net/http"
 	"os"
@@ -16,11 +15,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/diamondburned/arikawa/v2/api"
-	"github.com/diamondburned/arikawa/v2/bot"
-	"github.com/diamondburned/arikawa/v2/discord"
-	"github.com/diamondburned/arikawa/v2/gateway"
-	"github.com/diamondburned/arikawa/v2/utils/sendpart"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/bot"
+	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/arikawa/v3/gateway"
+	"github.com/diamondburned/arikawa/v3/utils/sendpart"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
 	"go.samhza.com/esammy/memegen"
@@ -48,7 +47,7 @@ func New(client *http.Client, tenorkey string) *Bot {
 }
 
 func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
-	msg, err := b.Ctx.SendMessage(m.ChannelID, "Pong!", nil)
+	msg, err := b.Ctx.SendMessage(m.ChannelID, "Pong!")
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,7 @@ module go.samhza.com/esammy
 go 1.16
 
 require (
-	github.com/diamondburned/arikawa/v2 v2.0.6
+	github.com/diamondburned/arikawa/v3 v3.0.0-20210623004816-354199383a0f
 	github.com/disintegration/imaging v1.6.2
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gorilla/schema v1.2.0
