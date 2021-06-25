@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 
@@ -107,47 +108,30 @@ func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	in, err := os.CreateTemp("", "esammy.*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(in.Name())
-	_, err = io.Copy(in, resp.Body)
-	in.Close()
+	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return err
 	}
-	if _, err = in.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
+	defer os.Remove(in.Name())
+	defer in.Close()
 	var v ff.Stream = ff.Video(ff.InputFile{File: in})
 	v = ff.Filter(v, "fps=20")
 	one, two := ff.Split(v)
 	palette := ff.PaletteGen(two)
 	v = ff.PaletteUse(one, palette)
 	fcmd := new(ff.Cmd)
-	out, err := os.CreateTemp("", "esammy.*")
+	out, err := createOutput(m.ID, "gif")
 	if err != nil {
 		return err
 	}
-	defer os.Remove(out.Name())
-	out.Close()
-	fcmd.AddFileOutput(out, []string{"-y", "-f", "gif"}, v)
+	defer out.Cleanup()
+	fcmd.AddFileOutput(out.File, []string{"-y", "-f", "gif"}, v)
 	err = fcmd.Cmd().Run()
 	if err != nil {
 		return err
 	}
-	out, err = os.Open(out.Name())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-		Files: []sendpart.File{{Name: "out.gif", Reader: out}},
-	})
-	return err
+	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
@@ -161,7 +145,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 	}
 	defer resp.Body.Close()
 	b := resp.Body
-	var meme sendpart.File
 	if media.Type == mediaImage {
 		img, _, err := image.Decode(b)
 		b.Close()
@@ -186,25 +169,22 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			png.Encode(w, dest)
 			w.Close()
 		}()
-		meme = sendpart.File{Name: "out.png", Reader: r}
+		_, err = bot.Ctx.SendMessageComplex(m.ChannelID,
+			api.SendMessageData{
+				Files: []sendpart.File{{Name: "out.png", Reader: r}}})
+		return err
 	} else {
-		tmp, err := os.CreateTemp("", "esammy.*")
+		in, err := downloadInput(resp.Body)
+		resp.Body.Close()
 		if err != nil {
-			return errors.Wrap(err, "error creating temporary file")
-		}
-		defer os.Remove(tmp.Name())
-		defer tmp.Close()
-		_, err = io.Copy(tmp, b)
-		if err != nil {
-			return errors.Wrap(err, "error downloading input")
-		}
-		b.Close()
-		if _, err = tmp.Seek(0, io.SeekStart); err != nil {
 			return err
 		}
+		defer os.Remove(in.Name())
+		defer in.Close()
 
-		input := ff.InputFile{File: tmp}
-		v, a := ff.Video(input), ff.Audio(input)
+		input := ff.InputFile{File: in}
+		var v ff.Stream
+		a := ff.Audio(input)
 
 		img, pt, under := imgfn(media.Width, media.Height)
 		pR, pW, err := os.Pipe()
@@ -229,11 +209,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			palette := ff.PaletteGen(two)
 			v = ff.PaletteUse(one, palette)
 		}
-		out, err := os.CreateTemp("", "esammy.*")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(out.Name())
 		fcmd := &ff.Cmd{}
 		var format string
 		streams := []ff.Stream{v}
@@ -244,8 +219,13 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		case mediaGIFV, mediaGIF:
 			format = "gif"
 		}
+		out, err := createOutput(m.ID, format)
+		if err != nil {
+			return err
+		}
+		defer out.Cleanup()
 		outopts := []string{"-f", format, "-shortest"}
-		fcmd.AddFileOutput(out, outopts, streams...)
+		fcmd.AddFileOutput(out.File, outopts, streams...)
 		cmd := fcmd.Cmd()
 		cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 		stderr := &bytes.Buffer{}
@@ -259,12 +239,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			}
 			return err
 		}
-		defer out.Close()
-		meme = sendpart.File{Name: "out." + format, Reader: out}
-
+		return out.Send(bot.Ctx.Client, m.ChannelID)
 	}
-	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{Files: []sendpart.File{meme}})
-	return err
 }
 
 func makeDrawable(img image.Image) draw.Image {
@@ -300,31 +276,23 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	tmp, err := os.CreateTemp("", "esammy.*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	defer tmp.Close()
-	_, err = io.Copy(tmp, resp.Body)
-	if err != nil {
-		return err
-	}
+	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
-	if _, err = tmp.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	out, err := vedit.Process(args, itype, tmp)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(out.Name())
-	defer out.Close()
-	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-		Files: []sendpart.File{{Name: "out.mp4", Reader: out}},
-	})
-	return err
+	defer os.Remove(in.Name())
+	defer in.Close()
+	out, err := createOutput(m.ID, "mp4")
+	if err != nil {
+		return err
+	}
+	defer out.Cleanup()
+	err = vedit.Process(args, itype, in, out.File)
+	if err != nil {
+		return err
+	}
+	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 
 func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
@@ -412,27 +380,18 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	default:
 		outformat = "mp4"
 	}
-	out, err := os.CreateTemp("", "esammy.*")
+	out, err := createOutput(m.ID, outformat)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(out.Name())
-	out.Close()
+	defer out.Cleanup()
 	fcmd := new(ff.Cmd)
-	fcmd.AddFileOutput(out, []string{"-y", "-f", outformat}, v)
+	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outformat}, v)
 	err = fcmd.Cmd().Run()
 	if err != nil {
 		return err
 	}
-	out, err = os.Open(out.Name())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-		Files: []sendpart.File{{Name: "out." + outformat, Reader: out}},
-	})
-	return err
+	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 
 func firstVidFrame(filename string) (image.Image, error) {
@@ -460,6 +419,66 @@ func detectCaption(m image.Image) (newMinY int, found bool) {
 		}
 	}
 	return 0, false
+}
+
+func createOutput(id discord.MessageID, ext string) (outputFile, error) {
+	f, err := os.OpenFile(
+		path.Join("/var/lib/esammy/out/", id.String()+"."+ext),
+		os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	return outputFile{File: f}, err
+}
+
+func downloadInput(body io.Reader) (*os.File, error) {
+	in, err := os.CreateTemp("", "esammy.*")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			in.Close()
+			os.Remove(in.Name())
+		}
+	}()
+	if _, err = io.Copy(in, body); err != nil {
+		return nil, err
+	}
+	if _, err = in.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return in, nil
+}
+
+type outputFile struct {
+	File *os.File
+	keep bool
+}
+
+func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
+	f := s.File
+	stat, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	_, name := path.Split(f.Name())
+	if stat.Size() <= 8000000 {
+		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
+			Files: []sendpart.File{{name, f}},
+		})
+		return err
+	}
+	_, err = ctx.SendMessage(id, "https://vvv.shibe.pro/"+name)
+	if err == nil {
+		s.keep = true
+	}
+	return err
+}
+
+func (s *outputFile) Cleanup() {
+	s.File.Close()
+	if s.keep {
+		return
+	}
+	os.Remove(s.File.Name())
 }
 
 type croppedImage struct {
