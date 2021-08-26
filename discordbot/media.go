@@ -37,7 +37,7 @@ func (b *Bot) findMedia(m discord.Message) (*Media, error) {
 			return media, nil
 		}
 	}
-	msgs, err := b.Ctx.Messages(m.ChannelID, 20)
+	msgs, err := b.Ctx.Client.Messages(m.ChannelID, 20)
 	if err != nil {
 		return nil, err
 	}

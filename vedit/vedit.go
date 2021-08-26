@@ -157,13 +157,13 @@ const (
 	InputImage
 )
 
-func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
-	width, height, err := probeSize(file)
+func Process(arg Arguments, itype InputType, in, out *os.File) error {
+	width, height, err := probeSize(in)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var v, a ff.Stream
-	instream := ff.InputFile{File: file}
+	instream := ff.InputFile{File: in}
 	if itype == InputImage {
 		instream.Options = []string{"-stream_loop", "-1"}
 		v = ff.Video(instream)
@@ -205,7 +205,7 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 			defer os.Remove(music)
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 		mus := ff.Audio(ff.Input{Name: music})
 		if arg.musicskip > 0 {
@@ -235,7 +235,7 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 		image := memegen.Impact(width, height, arg.tt, arg.bt)
 		imginput, cancel, err := imageInput(image)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer cancel()
 		v = ff.Overlay(v, imginput, 0, 0)
@@ -244,7 +244,7 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 		image, pt := memegen.Caption(width, height, arg.cap)
 		imginput, cancel, err := imageInput(image)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer cancel()
 		v = ff.Overlay(imginput, v, -pt.X, -pt.Y)
@@ -269,16 +269,12 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 		}
 		v = ff.Filter(v, fmt.Sprintf("fade=out:duration=%f:start_time=%f", fadeout, arg.fadeoutstart))
 	}
-	f, err := os.CreateTemp("", "esammy.*")
-	if err != nil {
-		return nil, err
-	}
 	fcmd := &ff.Cmd{}
 	outopts := []string{"-f", "mp4", "-shortest"}
 	if itype == InputVideo && ff.IsInputStream(v) {
 		outopts = append(outopts, "-c:v", "copy")
 	}
-	fcmd.AddFileOutput(f, outopts, v, a)
+	fcmd.AddFileOutput(out, outopts, v, a)
 	cmd := fcmd.Cmd()
 	cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 	stderr := &bytes.Buffer{}
@@ -287,12 +283,12 @@ func Process(arg Arguments, itype InputType, file *os.File) (*os.File, error) {
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			return nil, fmt.Errorf("exit status %d: %s",
+			return fmt.Errorf("exit status %d: %s",
 				exitError.ExitCode(), string(stderr.String()))
 		}
-		return nil, err
+		return err
 	}
-	return f, nil
+	return nil
 }
 
 func imageInput(img image.Image) (stream ff.Stream, cancel func(), err error) {

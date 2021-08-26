@@ -19,9 +19,9 @@ func init() {
 
 type config struct {
 	Token       string   `toml:"token"`
-	Tenor       string   `toml:"tenor"`
 	HTTPTimeout int      `toml:"http-timeout" default:"30000"`
 	Prefixes    []string `toml:"prefixes"`
+	discordbot.Config
 }
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 	httpClient := &http.Client{
 		Timeout: time.Duration(config.HTTPTimeout) * time.Millisecond}
 
-	dbot := discordbot.New(httpClient, config.Tenor)
+	dbot := discordbot.New(httpClient, config.Config)
 	wait, err := bot.Start(config.Token, dbot, func(ctx *bot.Context) error {
 		ctx.HasPrefix = bot.NewPrefix(config.Prefixes...)
 		ctx.SilentUnknown.Command = true
