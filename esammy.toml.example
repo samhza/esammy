@@ -2,3 +2,5 @@ token = ""
 prefixes = ["&"]
 http-timeout = 30000
 tenor = ""
+output-dir = ""
+output-url = ""
