@@ -463,7 +463,7 @@ type outputFile struct {
 
 func createOutput(id discord.MessageID, ext,
 	dir, baseurl string) (*outputFile, error) {
-	f, err := os.CreateTemp("", "esammy.*")
+	f, err := os.CreateTemp("", "esammy.*."+ext)
 	if err != nil {
 		return nil, err
 	}
