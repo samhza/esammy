@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/freetype/truetype"
-	"github.com/samhza/gg"
+	"go.samhza.com/gg"
 	"golang.org/x/image/font"
 )
 

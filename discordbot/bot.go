@@ -62,7 +62,7 @@ func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
 	}
 	ping := msg.Timestamp.Time().Sub(m.Timestamp.Time())
 	response := fmt.Sprintf("Pong! (Response time: `%s`)", ping)
-	_, err = b.Ctx.EditMessage(m.ChannelID, msg.ID, response, nil, false)
+	_, err = b.Ctx.EditMessage(m.ChannelID, msg.ID, response)
 	return err
 }
 
