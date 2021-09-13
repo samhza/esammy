@@ -373,7 +373,8 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	if !found {
 		return errors.New("couldn't find the caption")
 	}
-	var v ff.Stream = ff.Input{Name: inputf}
+	var instream ff.Stream = ff.Input{Name: inputf}
+	v, a := ff.Video(instream), ff.Audio(instream)
 	b := firstFrame.Bounds()
 	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
 		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
@@ -394,7 +395,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	}
 	defer out.Cleanup()
 	fcmd := new(ff.Cmd)
-	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outformat}, v)
+	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outformat}, v, a)
 	err = fcmd.Cmd().Run()
 	if err != nil {
 		return err
