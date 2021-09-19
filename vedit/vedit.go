@@ -12,8 +12,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kkdai/youtube/v2"
 	"go.samhza.com/esammy/memegen"
 	ff "go.samhza.com/ffmpeg"
+	"go.samhza.com/ytsearch"
 )
 
 type Arguments struct {
@@ -200,17 +202,14 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 		a = ff.Filter(a, "vibrato")
 	}
 	if arg.music != "" {
-		music, err := downloadMusic(arg.music)
-		if music != "" {
-			defer os.Remove(music)
-		}
+		music, err := getMusicURL(arg.music)
 		if err != nil {
 			return err
 		}
-		mus := ff.Audio(ff.Input{Name: music})
-		if arg.musicskip > 0 {
-			mus = ff.Filter(mus, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicskip))
-		}
+		mus := ff.Audio(ff.Input{Name: music, Options: []string{
+			"-ss", fmt.Sprintf("%v", arg.musicskip),
+			"-t", "600", // lets limit it to 10 minutes
+		}})
 		if arg.musicdelay > 0 {
 			part1, part2 := ff.ASplit(a)
 			part1 = ff.Filter(part1, fmt.Sprintf("atrim=end=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
@@ -343,28 +342,34 @@ func probeSize(file *os.File) (width, height int, err error) {
 	return width, height, nil
 }
 
-func downloadMusic(music string) (string, error) {
-	f, err := os.CreateTemp("", "esammy.*")
+func getMusicURL(music string) (string, error) {
+	ytc := new(youtube.Client)
+	vid, err := ytc.GetVideo(music)
 	if err != nil {
-		return "", err
-	}
-	f.Close()
-	cmd := exec.Command("youtube-dl",
-		"--max-filesize", "10m",
-		"--default-search", "ytsearch",
-		"-f", "[filesize<10M]249,250,251",
-		"--no-continue",
-		"-o", f.Name(),
-		music)
-	stderr := &bytes.Buffer{}
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return f.Name(), fmt.Errorf("exit status %d: %s",
-				exitError.ExitCode(), string(stderr.String()))
+		results, err := ytsearch.Search(music)
+		if err != nil {
+			return "", fmt.Errorf("searching: %w", err)
 		}
-		return f.Name(), err
+		if len(results) == 0 {
+			return "", fmt.Errorf("no search results")
+		}
+		vid, err = ytc.GetVideo(results[0].ID)
+		if err != nil {
+			return "", fmt.Errorf("fetching video: %w", err)
+		}
 	}
-	return f.Name(), nil
+	var format *youtube.Format
+Outer:
+	for _, fmt := range vid.Formats {
+		switch fmt.ItagNo {
+		case 249, 250, 251:
+			fmt := fmt
+			format = &fmt
+			break Outer
+		}
+	}
+	if format == nil {
+		return "", fmt.Errorf("audio stream for video not found")
+	}
+	return ytc.GetStreamURL(vid, format)
 }

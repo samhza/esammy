@@ -4,7 +4,6 @@ Discord bot made for friends to make memes with.
 
 ## Dependencies:
 - ffmpeg (optional, used if you want to edit gifs/videos)
-- youtube-dl (optional, used if you want to add music to videos)
 
 ## Usage
 
