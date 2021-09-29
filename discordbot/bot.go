@@ -177,10 +177,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			png.Encode(w, dest)
 			w.Close()
 		}()
-		_, err = bot.Ctx.SendMessageComplex(m.ChannelID,
-			api.SendMessageData{
-				Files: []sendpart.File{{Name: "out.png", Reader: r}}})
-		return err
+		return bot.sendFile(m.ChannelID, m.ID, "png", r)
 	} else {
 		in, err := downloadInput(resp.Body)
 		resp.Body.Close()
@@ -334,10 +331,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			png.Encode(w, cropped)
 			w.Close()
 		}()
-		_, err = bot.Ctx.SendMessageComplex(m.ChannelID, api.SendMessageData{
-			Files: []sendpart.File{{Name: "out.png", Reader: r}},
-		})
-		return err
+		return bot.sendFile(m.ChannelID, m.ID, "png", r)
 	}
 	in, err := os.CreateTemp("", "esammy.*")
 	if err != nil {
@@ -464,7 +458,7 @@ type outputFile struct {
 
 func createOutput(id discord.MessageID, ext,
 	dir, baseurl string) (*outputFile, error) {
-	f, err := os.CreateTemp("", "esammy.*."+ext)
+	f, err := os.Create(id.String() + "." + ext)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +480,7 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	_, name := path.Split(f.Name())
 	if stat.Size() <= 8000000 {
 		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
-			Files: []sendpart.File{{name, f}},
+			Files: []sendpart.File{{Name: name, Reader: f}},
 		})
 		return err
 	}
@@ -521,6 +515,36 @@ func (s *outputFile) Cleanup() {
 	} else {
 		os.Remove(s.File.Name())
 	}
+}
+
+func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
+	ext string, src io.Reader) error {
+	buf := new(bytes.Buffer) // TODO sync.Pool of buffers?
+	lr := &io.LimitedReader{R: src, N: 8000000}
+	_, err := buf.ReadFrom(lr)
+	if err != nil {
+		return err
+	}
+	if lr.N > 0 {
+		_, err := b.Ctx.SendMessageComplex(ch, api.SendMessageData{
+			Files: []sendpart.File{{Name: mid.String() + "." + ext, Reader: buf}},
+		})
+		return err
+	}
+	out, err := b.createOutput(mid, ext)
+	if err != nil {
+		return err
+	}
+	defer out.Cleanup()
+	_, err = buf.WriteTo(out.File)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out.File, src)
+	if err != nil {
+		return err
+	}
+	return out.Send(b.Ctx.Client, ch)
 }
 
 type croppedImage struct {
