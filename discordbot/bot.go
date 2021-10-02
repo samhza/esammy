@@ -368,7 +368,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		return errors.New("couldn't find the caption")
 	}
 	var instream ff.Stream = ff.Input{Name: inputf}
-	v, a := ff.Video(instream), ff.Audio(instream)
+	v, a := ff.Video(instream), ff.Optional(ff.Audio(instream))
 	b := firstFrame.Bounds()
 	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
 		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
