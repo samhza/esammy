@@ -3,11 +3,14 @@ package memegen
 import (
 	_ "embed"
 	"image"
+	"image/draw"
 	"strings"
+	"unicode"
 
 	"github.com/golang/freetype/truetype"
 	"go.samhza.com/gg"
 	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
@@ -37,18 +40,77 @@ func init() {
 // Impact generates the text for an Impact font meme.
 // The returned image is meant to be used as an src for a call to draw.Draw with
 // draw.Over as the op.
-func Impact(w, h int, top, bot string) image.Image {
-	dc := gg.NewContext(w, h)
-	dc.Clear()
+func Impact(m draw.Image, top, bot string) {
+	b := m.Bounds()
+	w, h := b.Max.X-b.Min.X, b.Max.Y-b.Min.Y
 	face := truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
-	dc.SetFontFace(face)
-	limitWrappedTextHeight(dc, impactFont, top, float64(w), float64(h)/2, 1.0)
-	drawOutlinedText(dc, top, float64(w/2), dc.FontHeight()*0.3, 0.5, 0, float64(w), 1)
-	face = truetype.NewFace(impactFont, &truetype.Options{Size: float64(h / 8)})
-	dc.SetFontFace(face)
-	limitWrappedTextHeight(dc, impactFont, bot, float64(w), float64(h)/2, 1.0)
-	drawOutlinedText(dc, bot, float64(w/2), float64(h)-dc.FontHeight()*0.3, 0.5, 1, float64(w), 1)
-	return dc.Image()
+	dr := &font.Drawer{
+		Face: face,
+		Dst:  m,
+		Src:  image.Black,
+	}
+	fn := func(x, y int) {
+		drawStringCentered(dr, w, x, h/8+y, top)
+	}
+	fn(-1, -1)
+	fn(-1, +1)
+	fn(1, -1)
+	fn(1, 1)
+	dr.Src = image.White
+	fn(0, 0)
+}
+
+func drawStringCentered(dr *font.Drawer, w, x, y int, str string) {
+	dr.Dot = fixed.Point26_6{(fixed.I(w)-dr.MeasureString(str))/2 + fixed.I(x), dr.Face.Metrics().Height + fixed.I(y)}
+	dr.DrawString(str)
+}
+
+func wrap(dr font.Drawer, width int, str string) []string {
+	var result []string
+	for _, line := range strings.Split(str, "\n") {
+		fields := splitOnSpace(line)
+		if len(fields)%2 == 1 {
+			fields = append(fields, "")
+		}
+		x := ""
+		for i := 0; i < len(fields); i += 2 {
+			w := dr.MeasureString(x + fields[i])
+			if w.Ceil() > width {
+				if x == "" {
+					result = append(result, fields[i])
+					x = ""
+					continue
+				} else {
+					result = append(result, x)
+					x = ""
+				}
+			}
+			x += fields[i] + fields[i+1]
+		}
+		if x != "" {
+			result = append(result, x)
+		}
+	}
+	for i, line := range result {
+		result[i] = strings.TrimSpace(line)
+	}
+	return result
+}
+
+func splitOnSpace(x string) []string {
+	var result []string
+	pi := 0
+	ps := false
+	for i, c := range x {
+		s := unicode.IsSpace(c)
+		if s != ps && i > 0 {
+			result = append(result, x[pi:i])
+			pi = i
+		}
+		ps = s
+	}
+	result = append(result, x[pi:])
+	return result
 }
 
 // Caption makes an iFunny-like caption meant to have another image overlayed

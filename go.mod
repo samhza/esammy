@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/diamondburned/arikawa/v3 v3.0.0-rc.1.0.20210910041222-76ec9cd43d76
 	github.com/disintegration/imaging v1.6.2
+	github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gorilla/schema v1.2.0
 	github.com/kkdai/youtube/v2 v2.7.4

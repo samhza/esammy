@@ -231,8 +231,9 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 		a = ff.ATempo(a, *arg.speed)
 	}
 	if arg.tt != "" || arg.bt != "" {
-		image := memegen.Impact(width, height, arg.tt, arg.bt)
-		imginput, cancel, err := imageInput(image)
+		m := image.NewRGBA(image.Rect(0, 0, width, height))
+		memegen.Impact(m, arg.tt, arg.bt)
+		imginput, cancel, err := imageInput(m)
 		if err != nil {
 			return err
 		}
