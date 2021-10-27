@@ -37,9 +37,6 @@ func init() {
 	}
 }
 
-// Impact generates the text for an Impact font meme.
-// The returned image is meant to be used as an src for a call to draw.Draw with
-// draw.Over as the op.
 func Impact(m draw.Image, top, bot string) {
 	b := m.Bounds()
 	w, h := b.Max.X-b.Min.X, b.Max.Y-b.Min.Y
@@ -47,17 +44,49 @@ func Impact(m draw.Image, top, bot string) {
 	dr := &font.Drawer{
 		Face: face,
 		Dst:  m,
-		Src:  image.Black,
 	}
-	fn := func(x, y int) {
-		drawStringCentered(dr, w, x, h/8+y, top)
+	var text []string
+	var y int
+	fn := func(xoff, yoff int) {
+		drawStringsCentered(dr, w, xoff, y+yoff, 0, text)
 	}
-	fn(-1, -1)
-	fn(-1, +1)
-	fn(1, -1)
-	fn(1, 1)
-	dr.Src = image.White
-	fn(0, 0)
+	draw := func() {
+		dr.Src = image.Black
+		fn(-1, -1)
+		fn(-1, +1)
+		fn(1, -1)
+		fn(1, 1)
+		dr.Src = image.White
+		fn(0, 0)
+	}
+
+	text = wrap(dr, w, top)
+	y = h / 32
+	draw()
+
+	text = wrap(dr, w, bot)
+	_, texth := measure(dr, text)
+	y = h - texth - h/32
+	draw()
+}
+
+func measure(dr *font.Drawer, lines []string) (w, h int) {
+	var fixw fixed.Int26_6
+	faceh := dr.Face.Metrics().Height.Ceil()
+	for _, line := range lines {
+		fixw += dr.MeasureString(line)
+		h += faceh
+	}
+	w = fixw.Ceil()
+	return
+}
+
+func drawStringsCentered(dr *font.Drawer, w, x, y, pad int, lines []string) {
+	faceh := dr.Face.Metrics().Height.Ceil()
+	for _, str := range lines {
+		drawStringCentered(dr, w, x, y, str)
+		y += faceh + pad
+	}
 }
 
 func drawStringCentered(dr *font.Drawer, w, x, y int, str string) {
@@ -65,7 +94,7 @@ func drawStringCentered(dr *font.Drawer, w, x, y int, str string) {
 	dr.DrawString(str)
 }
 
-func wrap(dr font.Drawer, width int, str string) []string {
+func wrap(dr *font.Drawer, width int, str string) []string {
 	var result []string
 	for _, line := range strings.Split(str, "\n") {
 		fields := splitOnSpace(line)
