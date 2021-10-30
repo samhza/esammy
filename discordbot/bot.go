@@ -10,9 +10,9 @@ import (
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/pkg/errors"
-	"go.samhza.com/esammy/tenor"
-	"go.samhza.com/esammy/vedit"
-	ff "go.samhza.com/ffmpeg"
+	"samhza.com/esammy/tenor"
+	"samhza.com/esammy/vedit"
+	ff "samhza.com/ffmpeg"
 )
 
 type Bot struct {
@@ -79,7 +79,7 @@ func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
-	in, err := downloadInput(resp.Body)
+	in, err := downloadInputFD(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	if err != nil {
 		return err
 	}
-	in, err := downloadInput(resp.Body)
+	in, err := downloadInputFD(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 
-func downloadInput(body io.Reader) (*os.File, error) {
+func downloadInputFD(body io.Reader) (*os.File, error) {
 	in, err := os.CreateTemp("", "esammy.*")
 	if err != nil {
 		return nil, err

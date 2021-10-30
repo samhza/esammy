@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"go.samhza.com/esammy/discordbot"
+	"samhza.com/esammy/discordbot"
 
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/pelletier/go-toml"

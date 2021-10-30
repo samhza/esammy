@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/diamondburned/arikawa/v3/gateway"
-	ff "go.samhza.com/ffmpeg"
+	ff "samhza.com/ffmpeg"
 )
 
 func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {

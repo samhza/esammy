@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/kkdai/youtube/v2"
-	"go.samhza.com/esammy/memegen"
-	ff "go.samhza.com/ffmpeg"
-	"go.samhza.com/ytsearch"
+	"samhza.com/esammy/memegen"
+	ff "samhza.com/ffmpeg"
+	"samhza.com/ytsearch"
 )
 
 type Arguments struct {
@@ -160,10 +160,26 @@ const (
 )
 
 func Process(arg Arguments, itype InputType, in, out *os.File) error {
-	width, height, err := probeSize(in)
+	probed, err := ff.ProbeReader(in)
 	if err != nil {
 		return err
 	}
+	if _, err := in.Seek(0, 0); err != nil {
+		return err
+	}
+
+	width, height := -1, -1
+Outer:
+	for _, stream := range probed.Streams {
+		if stream.CodecType == ff.CodecTypeVideo {
+			width, height = stream.Width, stream.Height
+			break Outer
+		}
+	}
+	if width == -1 || height == -1 {
+		return errors.New("no video stream found")
+	}
+
 	var v, a ff.Stream
 	instream := ff.InputFile{File: in}
 	if itype == InputImage {

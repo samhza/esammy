@@ -55,14 +55,14 @@ func createOutput(id discord.MessageID, ext,
 	of := new(outputFile)
 	of.baseurl = baseurl
 	of.File = f
-	if dir != "" {
-		of.moveto = path.Join(dir, id.String()+"."+ext)
-	}
+	of.name = id.String() + "." + ext
+	of.moveto = path.Join(dir, of.name)
 	return of, err
 }
 
 type outputFile struct {
 	File    *os.File
+	name    string
 	moveto  string
 	baseurl string
 	moved   bool
@@ -75,10 +75,9 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	if err != nil {
 		return err
 	}
-	_, name := path.Split(f.Name())
 	if stat.Size() <= 8000000 {
 		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
-			Files: []sendpart.File{{Name: name, Reader: f}},
+			Files: []sendpart.File{{Name: s.name, Reader: f}},
 		})
 		return err
 	}
@@ -95,8 +94,7 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 		return err
 	}
 	s.moved = true
-	_, name = path.Split(s.moveto)
-	_, err = ctx.SendMessage(id, s.baseurl+name)
+	_, err = ctx.SendMessage(id, s.baseurl+s.name)
 	if err == nil {
 		s.keep = true
 	}

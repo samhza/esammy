@@ -7,7 +7,7 @@ Discord bot made for friends to make memes with.
 
 ## Usage
 
-Install with `go get go.samhza.com/esammy`.
+Install with `go get samhza.com/esammy`.
 
 See `esammy.toml.example` for example config.
 

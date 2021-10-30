@@ -4,11 +4,12 @@ import (
 	_ "embed"
 	"image"
 	"image/draw"
+	"math"
 	"strings"
 	"unicode"
 
 	"github.com/golang/freetype/truetype"
-	"go.samhza.com/gg"
+	"samhza.com/gg"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
@@ -173,7 +174,7 @@ func Caption(w, h int, text string) (image.Image, image.Point) {
 		0.5, 0.5,
 		float64(w), linespc, gg.AlignCenter)
 
-	return dc.Image(), image.Point{0, -int(rectH)}
+	return dc.Image(), image.Point{0, -int(math.Floor(rectH))}
 }
 
 // Motivate makes a "motivational meme" frame meant to have another image overlayed onto it.
@@ -229,19 +230,6 @@ func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 	}
 
 	return dc.Image(), image.Point{-padding, -padding}
-}
-
-func drawOutlinedText(dc *gg.Context, s string,
-	x, y, ax, ay, width float64, sp float64) {
-	dc.SetRGB(0, 0, 0)
-	n := dc.FontHeight() / 20
-	w := width * .95
-	dc.DrawStringWrapped(s, x+n, y+n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x-n, y-n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x+n, y-n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x-n, y+n, ax, ay, w, sp, gg.AlignCenter)
-	dc.SetRGB(1, 1, 1)
-	dc.DrawStringWrapped(s, x, y, ax, ay, w, sp, gg.AlignCenter)
 }
 
 func limitWrappedTextHeight(dc *gg.Context,

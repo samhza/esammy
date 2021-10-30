@@ -1,8 +1,9 @@
-module go.samhza.com/esammy
+module samhza.com/esammy
 
 go 1.16
 
 require (
+	github.com/carbocation/go-quantize v0.0.0-20210217220615-6c4ee5bfa11e
 	github.com/diamondburned/arikawa/v3 v3.0.0-rc.1.0.20210910041222-76ec9cd43d76
 	github.com/disintegration/imaging v1.6.2
 	github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4
@@ -11,9 +12,9 @@ require (
 	github.com/kkdai/youtube/v2 v2.7.4
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	go.samhza.com/ffmpeg v0.0.0-20211002043050-2ca8331ca532
-	go.samhza.com/gg v1.3.1-0.20210316180522-5c6054f09523
-	go.samhza.com/ytsearch v0.0.0-20210918035954-168ad7745d7a
 	golang.org/x/image v0.0.0-20210504121937-7319ad40d33e
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
+	samhza.com/ffmpeg v0.0.0-20220104160918-b1bc70395af8
+	samhza.com/gg v1.3.1-0.20210316180522-5c6054f09523
+	samhza.com/ytsearch v0.0.0-20220104160835-a0930e67ff04
 )

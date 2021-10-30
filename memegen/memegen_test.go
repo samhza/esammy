@@ -2,18 +2,19 @@ package memegen
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"image/gif"
 	"image/png"
 	"io"
 	"os"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/carbocation/go-quantize/quantize"
 	"github.com/disintegration/imaging"
+	"samhza.com/esammy/internal/gif"
 )
 
 func BenchmarkMeme(b *testing.B) {
@@ -60,49 +61,98 @@ func BenchmarkMemeGIF(b *testing.B) {
 	}
 	buf := new(bytes.Buffer)
 	for n := 0; n < b.N; n++ {
-		g, err := gif.DecodeAll(bytes.NewReader(p))
+		r := gif.NewReader(bytes.NewReader(p))
+		w := gif.NewWriter(buf)
+		cfg, err := r.ReadHeader()
 		if err != nil {
-			b.Fatal(p)
+			b.Fatal(err)
 		}
-		textm := image.NewRGBA(image.Rect(0, 0, g.Config.Width, g.Config.Height))
+		if err = w.WriteHeader(*cfg); err != nil {
+			b.Fatal(err)
+		}
+		bounds := image.Rect(0, 0, cfg.Width, cfg.Height)
+		textm := image.NewRGBA(bounds)
 		Impact(textm, "HELLO", "bottom text...")
-		bounds := image.Rect(0, 0, g.Config.Width, g.Config.Height)
-		var wg sync.WaitGroup
-		wg.Add(len(g.Image))
+
+		const concurrency = 8
 		type bruh struct {
-			k int
-			i *image.Paletted
+			n  int
+			pm *image.Paletted
+			m  draw.Image
 		}
-		out := make(chan bruh)
-		for i, frame := range g.Image {
-			go func(i int, frame image.Image) {
-				m := image.NewRGBA(image.Rect(0, 0, g.Config.Width, g.Config.Height))
-				draw.Draw(m, bounds, frame, image.Point{}, draw.Src)
-				draw.Draw(m, bounds, textm, image.Point{}, draw.Over)
-				p := image.NewPaletted(bounds, quantize.MedianCutQuantizer{}.Quantize(make([]color.Color, 0, 256), m))
-				draw.Draw(p, bounds, m, image.Point{}, draw.Src)
-				out <- bruh{i, p}
-				wg.Done()
-			}(i, frame)
+		in, out := make(chan bruh, concurrency), make(chan bruh, concurrency)
+		for i := 0; i < concurrency; i++ {
+			go func(i int) {
+				defer fmt.Println("worker exit", i)
+				for b := range in {
+					draw.Draw(b.m, bounds, b.pm, image.Point{}, draw.Src)
+					draw.Draw(b.m, bounds, textm, image.Point{}, draw.Over)
+					b.pm.Palette = quantize.MedianCutQuantizer{}.Quantize(make([]color.Color, 0, 256), b.m)
+					draw.Draw(b.pm, bounds, b.m, image.Point{}, draw.Src)
+					out <- b
+				}
+			}(i)
 		}
-		frames := make([]*image.Paletted, len(g.Image))
-		sorted := make(chan struct{})
-		go func() {
-			for b := range out {
-				frames[b.k] = b.i
+		firstBatch := true
+		scratch := make(chan bruh, concurrency)
+
+		frames := make([]gif.ImageBlock, concurrency)
+		readall := false
+		for {
+			if readall {
+				break
 			}
-			sorted <- struct{}{}
-		}()
-		wg.Wait()
-		close(out)
-		<-sorted
-		g.Image = frames
-		err = gif.EncodeAll(buf, g)
+			var n int
+			for n = 0; n < concurrency; n++ {
+				block, err := r.ReadImage()
+				if err != nil {
+					b.Fatal(err)
+				}
+				if block == nil {
+					readall = true
+					close(in)
+					break
+				}
+				frames[n] = *block
+				var b bruh
+				if firstBatch {
+					b = bruh{n, image.NewPaletted(bounds, nil), image.NewRGBA(bounds)}
+				} else {
+					b = <-scratch
+					b.n = n
+				}
+				copyPaletted(b.pm, block.Image)
+				in <- b
+			}
+			firstBatch = false
+			for j := 0; j < n; j++ {
+				b := <-out
+				frames[b.n].Image = b.pm
+				scratch <- b
+			}
+			for j := 0; j < n; j++ {
+				err := w.WriteFrame(frames[j])
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+
+		err = w.Close()
 		if err != nil {
-			b.Fatal(p)
+			b.Fatal(err)
 		}
 	}
+	time.Sleep(2 * time.Second)
 	os.WriteFile("out.gif", buf.Bytes(), 0666)
+}
+
+func copyPaletted(dst, src *image.Paletted) {
+	copy(dst.Pix, src.Pix)
+	dst.Stride = src.Stride
+	dst.Rect = src.Rect
+	dst.Palette = make(color.Palette, len(src.Palette))
+	copy(dst.Palette, src.Palette)
 }
 
 /*
@@ -129,9 +179,3 @@ for n := 0; n < b.N; n++ {
 	}
 }
 */
-
-func bail(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
