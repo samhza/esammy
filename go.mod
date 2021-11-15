@@ -11,7 +11,7 @@ require (
 	github.com/kkdai/youtube/v2 v2.7.4
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	go.samhza.com/ffmpeg v0.0.0-20211002043050-2ca8331ca532
+	go.samhza.com/ffmpeg v0.0.0-20211113214348-7c645f55bfdd
 	go.samhza.com/gg v1.3.1-0.20210316180522-5c6054f09523
 	go.samhza.com/ytsearch v0.0.0-20210918035954-168ad7745d7a
 	golang.org/x/image v0.0.0-20210504121937-7319ad40d33e

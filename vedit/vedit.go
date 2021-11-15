@@ -160,9 +160,24 @@ const (
 )
 
 func Process(arg Arguments, itype InputType, in, out *os.File) error {
-	width, height, err := probeSize(in)
+	probed, err := ff.ProbeReader(in)
 	if err != nil {
 		return err
+	}
+	if _, err = in.Seek(0, 0); err != nil {
+		return err
+	}
+	width, height := -1, -1
+	var hasAudio bool
+	var inDur string
+	for _, stream := range probed.Streams {
+		if stream.CodecType == ff.CodecTypeVideo {
+			width = stream.Width
+			height = stream.Height
+			inDur = stream.Duration
+		} else {
+			hasAudio = true
+		}
 	}
 	var v, a ff.Stream
 	instream := ff.InputFile{File: in}
@@ -174,8 +189,15 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 		a = ff.Filter(ff.ANullSrc,
 			"atrim=duration="+strconv.Itoa(arg.length))
 	} else {
-		v, a = ff.Video(instream), ff.Audio(instream)
+		v = ff.Video(instream)
+		if hasAudio {
+			a = ff.Audio(instream)
+		} else {
+			a = ff.Filter(ff.ANullSrc,
+				"atrim=duration="+inDur)
+		}
 	}
+
 	if arg.mute {
 		a = ff.Volume(a, 0)
 	}

@@ -3,6 +3,14 @@ package discordbot
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -10,12 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"go.samhza.com/esammy/memegen"
 	"go.samhza.com/ffmpeg"
-	"image"
-	"image/draw"
-	"image/png"
-	"io"
-	"os"
-	"os/exec"
 )
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
@@ -135,6 +137,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 		stderr := &bytes.Buffer{}
 		cmd.Stderr = stderr
+		log.Println(cmd)
 		err = cmd.Run()
 		if err != nil {
 			var exitError *exec.ExitError

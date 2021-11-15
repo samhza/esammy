@@ -88,7 +88,29 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		return errors.New("couldn't find the caption")
 	}
 	var instream ff.Stream = ff.InputFile{File: in}
-	v, a := ff.Video(instream), ff.Optional(ff.Audio(instream))
+
+	probed, err := ff.Probe(in.Name())
+	if err != nil {
+		return err
+	}
+	var hasAudio bool
+	var inDur string
+	for _, stream := range probed.Streams {
+		if stream.CodecType == ff.CodecTypeVideo {
+			inDur = stream.Duration
+		} else {
+			hasAudio = true
+		}
+	}
+	var v, a ff.Stream
+	v = ff.Video(instream)
+	if hasAudio {
+		a = ff.Audio(instream)
+	} else {
+		a = ff.Filter(ff.ANullSrc,
+			"atrim=duration="+inDur)
+	}
+
 	b := firstFrame.Bounds()
 	var outfmt string
 	if media.Type == mediaGIFV {
