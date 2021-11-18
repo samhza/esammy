@@ -17,7 +17,7 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
 	"go.samhza.com/esammy/memegen"
-	"go.samhza.com/ffmpeg"
+	ff "go.samhza.com/ffmpeg"
 )
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
@@ -89,9 +89,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		defer os.Remove(in.Name())
 		defer in.Close()
 
-		input := ffmpeg.InputFile{File: in}
-		var v ffmpeg.Stream
-		a := ffmpeg.Audio(input)
+		input := ff.InputFile{File: in}
+		var v ff.Stream
 
 		img, pt, under := imgfn(media.Width, media.Height)
 		pR, pW, err := os.Pipe()
@@ -104,25 +103,41 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			enc.Encode(pW, img)
 			pW.Close()
 		}()
-		imginput := ffmpeg.InputFile{File: pR}
+		imginput := ff.InputFile{File: pR}
 		if under {
-			v = ffmpeg.Overlay(imginput, input, -pt.X, -pt.Y)
+			v = ff.Overlay(imginput, input, -pt.X, -pt.Y)
 		} else {
-			v = ffmpeg.Overlay(input, imginput, -pt.X, -pt.Y)
+			v = ff.Overlay(input, imginput, -pt.X, -pt.Y)
 		}
 		if media.Type == mediaGIFV || media.Type == mediaGIF {
-			v = ffmpeg.Filter(v, "fps=20")
-			one, two := ffmpeg.Split(v)
-			palette := ffmpeg.PaletteGen(two)
-			v = ffmpeg.PaletteUse(one, palette)
+			v = ff.Filter(v, "fps=20")
+			one, two := ff.Split(v)
+			palette := ff.PaletteGen(two)
+			v = ff.PaletteUse(one, palette)
 		}
-		fcmd := &ffmpeg.Cmd{}
+		fcmd := &ff.Cmd{}
 		var format string
-		streams := []ffmpeg.Stream{v}
+		streams := []ff.Stream{v}
 		switch media.Type {
 		case mediaVideo:
 			format = "mp4"
-			streams = append(streams, a)
+			probed, err := ff.ProbeReader(in)
+			if err != nil {
+				return err
+			}
+			if _, err = in.Seek(0, 0); err != nil {
+				return err
+			}
+			var hasAudio bool
+			for _, stream := range probed.Streams {
+				if stream.CodecType == ff.CodecTypeAudio {
+					hasAudio = true
+					break
+				}
+			}
+			if hasAudio {
+				streams = append(streams, ff.Audio(input))
+			}
 		case mediaGIFV, mediaGIF:
 			format = "gif"
 		}
