@@ -94,19 +94,18 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		return err
 	}
 	var hasAudio bool
-	var inDur string
 	for _, stream := range probed.Streams {
-		if stream.CodecType == ff.CodecTypeVideo {
-			inDur = stream.Duration
-		} else {
+		if stream.CodecType == ff.CodecTypeAudio {
 			hasAudio = true
 		}
 	}
-	var v, a ff.Stream
-	v = ff.Video(instream)
+	var v ff.Stream = ff.Video(instream)
 
 	b := firstFrame.Bounds()
+	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
+		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
 	var outfmt string
+	streams := []ff.Stream{v}
 	if media.Type == mediaGIFV {
 		v = ff.Filter(v, "fps=20")
 		one, two := ff.Split(v)
@@ -116,21 +115,16 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	} else {
 		outfmt = "mp4"
 		if hasAudio {
-			a = ff.Audio(instream)
-		} else {
-			a = ff.Filter(ff.ANullSrc,
-				"atrim=duration="+inDur)
+			streams = append(streams, ff.Audio(instream))
 		}
 	}
-	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
-		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
 	out, err := bot.createOutput(m.ID, outfmt)
 	if err != nil {
 		return err
 	}
 	defer out.Cleanup()
 	fcmd := new(ff.Cmd)
-	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outfmt}, v, a)
+	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outfmt}, streams...)
 	err = fcmd.Cmd().Run()
 	if err != nil {
 		return err
