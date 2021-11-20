@@ -104,12 +104,6 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	}
 	var v, a ff.Stream
 	v = ff.Video(instream)
-	if hasAudio {
-		a = ff.Audio(instream)
-	} else {
-		a = ff.Filter(ff.ANullSrc,
-			"atrim=duration="+inDur)
-	}
 
 	b := firstFrame.Bounds()
 	var outfmt string
@@ -121,6 +115,12 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		outfmt = "gif"
 	} else {
 		outfmt = "mp4"
+		if hasAudio {
+			a = ff.Audio(instream)
+		} else {
+			a = ff.Filter(ff.ANullSrc,
+				"atrim=duration="+inDur)
+		}
 	}
 	v = ff.Filter(v, "crop=y="+strconv.Itoa(newMinY)+
 		":out_h="+strconv.Itoa(b.Max.Y-newMinY))
