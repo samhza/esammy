@@ -26,6 +26,9 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 	}
 	if lr.N > 0 {
 		_, err := b.Ctx.SendMessageComplex(ch, api.SendMessageData{
+			Reference: &discord.MessageReference{
+				MessageID: mid,
+			},
 			Files: []sendpart.File{{Name: mid.String() + "." + ext, Reader: buf}},
 		})
 		return err
