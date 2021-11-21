@@ -47,6 +47,8 @@ func (b *Bot) createOutput(id discord.MessageID, ext string) (*outputFile, error
 	return createOutput(id, ext, b.cfg.OutputDir, b.cfg.OutputURL)
 }
 
+// sendFile sends the contents of a reader into a channel. See outputFile for
+// more information.
 func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 	ext string, src io.Reader) error {
 	buf := new(bytes.Buffer) // TODO sync.Pool of buffers?
@@ -96,6 +98,9 @@ func createOutput(id discord.MessageID, ext,
 	return of, err
 }
 
+// outputFile is a file that will be sent to Discord. If the file is small
+// enough, it will be sent as a file attachment and deleted. If the file is too
+// large, it will be moved to a file and sent as a link instead.
 type outputFile struct {
 	File    *os.File
 	name    string
@@ -137,6 +142,7 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	return err
 }
 
+// Cleanup deletes the file if it shouldn't be kept, or does nothing.
 func (s *outputFile) Cleanup() {
 	s.File.Close()
 	if s.keep {
