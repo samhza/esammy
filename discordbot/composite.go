@@ -7,9 +7,9 @@ import (
 	"image/draw"
 	"image/png"
 	"io"
-	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -20,7 +20,22 @@ import (
 	ff "go.samhza.com/ffmpeg"
 )
 
-type compositeFunc func(int, int) (image.Image, image.Point, bool)
+type MemeArguments struct {
+	Top,
+	Bottom string
+}
+
+func (m *MemeArguments) CustomParse(args string) error {
+	if args == "" {
+		return errors.New("you need some text for me to generate the image")
+	}
+	split := strings.SplitN(args, ",", 2)
+	m.Top = strings.TrimSpace(split[0])
+	if len(split) == 2 {
+		m.Bottom = strings.TrimSpace(split[1])
+	}
+	return nil
+}
 
 func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) error {
 	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
@@ -44,6 +59,8 @@ func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) err
 	})
 }
 
+type compositeFunc func(int, int) (image.Image, image.Point, bool)
+
 func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 	media, err := bot.findMedia(m)
 	if err != nil {
@@ -53,6 +70,8 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 	if err != nil {
 		return err
 	}
+	done := bot.startWorking(m.ChannelID, m.ID)
+	defer done()
 	defer resp.Body.Close()
 	b := resp.Body
 	if media.Type == mediaImage {
@@ -79,6 +98,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			png.Encode(w, dest)
 			w.Close()
 		}()
+		done()
 		return bot.sendFile(m.ChannelID, m.ID, "png", r)
 	} else {
 		in, err := downloadInput(resp.Body)
@@ -152,7 +172,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
 		stderr := &bytes.Buffer{}
 		cmd.Stderr = stderr
-		log.Println(cmd)
 		err = cmd.Run()
 		if err != nil {
 			var exitError *exec.ExitError
@@ -162,6 +181,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			}
 			return err
 		}
+		done()
 		return out.Send(bot.Ctx.Client, m.ChannelID)
 	}
 }

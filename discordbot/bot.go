@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -50,23 +49,6 @@ func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
 	return err
 }
 
-type MemeArguments struct {
-	Top,
-	Bottom string
-}
-
-func (m *MemeArguments) CustomParse(args string) error {
-	if args == "" {
-		return errors.New("you need some text for me to generate the image")
-	}
-	split := strings.SplitN(args, ",", 2)
-	m.Top = strings.TrimSpace(split[0])
-	if len(split) == 2 {
-		m.Bottom = strings.TrimSpace(split[1])
-	}
-	return nil
-}
-
 func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	media, err := bot.findMedia(m.Message)
 	if err != nil {
@@ -79,6 +61,8 @@ func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
+	done := bot.startWorking(m.ChannelID, m.ID)
+	defer done()
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
@@ -128,6 +112,8 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	if err != nil {
 		return err
 	}
+	done := bot.startWorking(m.ChannelID, m.ID)
+	defer done()
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
@@ -144,6 +130,7 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	if err != nil {
 		return err
 	}
+	done()
 	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 

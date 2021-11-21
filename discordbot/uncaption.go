@@ -16,6 +16,8 @@ import (
 	ff "go.samhza.com/ffmpeg"
 )
 
+// TODO: split Uncaption into multiple functions
+
 func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	media, err := bot.findMedia(m.Message)
 	if err != nil {
@@ -25,6 +27,8 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
+	done := bot.startWorking(m.ChannelID, m.ID)
+	defer done()
 	defer resp.Body.Close()
 	switch media.Type {
 	case mediaImage:
@@ -46,6 +50,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			png.Encode(w, cropped)
 			w.Close()
 		}()
+		done()
 		return bot.sendFile(m.ChannelID, m.ID, "png", r)
 	case mediaGIF:
 		dgif, err := gif.DecodeAll(resp.Body)
@@ -69,8 +74,8 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		go func() {
 			w.CloseWithError(gif.EncodeAll(w, dgif))
 		}()
+		done()
 		return bot.sendFile(m.ChannelID, m.ID, "gif", r)
-
 	}
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
@@ -129,6 +134,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
+	done()
 	return out.Send(bot.Ctx.Client, m.ChannelID)
 }
 

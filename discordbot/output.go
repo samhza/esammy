@@ -5,12 +5,43 @@ import (
 	"io"
 	"os"
 	"path"
+	"sync"
+	"time"
 
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/sendpart"
 	"github.com/pkg/errors"
 )
+
+// startWorking sends a "Working..." to inform the user that the bot is working
+// on generating the output. The returned function must be called to delete the
+// "Working..." message. The returned function may be called more than once, any
+// calls after the first will be ignored.
+func (b *Bot) startWorking(ch discord.ChannelID, m discord.MessageID) func() {
+	done := make(chan struct{})
+	timer := time.NewTimer(500 * time.Millisecond)
+	go func() {
+		var msg *discord.Message
+		var err error
+		select {
+		case <-done:
+			timer.Stop()
+			return
+		case <-timer.C:
+			msg, err = b.Ctx.SendTextReply(ch, "Working...", m)
+		}
+		<-done
+		if err != nil {
+			return
+		}
+		b.Ctx.DeleteMessage(ch, msg.ID, "")
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() { close(done) })
+	}
+}
 
 func (b *Bot) createOutput(id discord.MessageID, ext string) (*outputFile, error) {
 	return createOutput(id, ext, b.cfg.OutputDir, b.cfg.OutputURL)
