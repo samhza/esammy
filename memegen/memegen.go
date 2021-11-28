@@ -50,12 +50,13 @@ func Impact(m draw.Image, top, bot string) {
 	fn := func(xoff, yoff int) {
 		drawStringsCentered(dr, w, xoff, y+yoff, 0, text)
 	}
+	n := h / 160
 	draw := func() {
 		dr.Src = image.Black
-		fn(-1, -1)
-		fn(-1, +1)
-		fn(1, -1)
-		fn(1, 1)
+		fn(-n, -n)
+		fn(-n, +n)
+		fn(n, -n)
+		fn(n, n)
 		dr.Src = image.White
 		fn(0, 0)
 	}
