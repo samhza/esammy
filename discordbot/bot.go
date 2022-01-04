@@ -9,9 +9,9 @@ import (
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/pkg/errors"
-	"go.samhza.com/esammy/tenor"
-	"go.samhza.com/esammy/vedit"
-	ff "go.samhza.com/ffmpeg"
+	"samhza.com/esammy/tenor"
+	"samhza.com/esammy/vedit"
+	ff "samhza.com/ffmpeg"
 )
 
 type Bot struct {

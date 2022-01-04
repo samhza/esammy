@@ -8,7 +8,7 @@ import (
 	"unicode"
 
 	"github.com/golang/freetype/truetype"
-	"go.samhza.com/gg"
+	"samhza.com/gg"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )

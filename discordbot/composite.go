@@ -16,8 +16,8 @@ import (
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"go.samhza.com/esammy/memegen"
-	ff "go.samhza.com/ffmpeg"
+	"samhza.com/esammy/memegen"
+	ff "samhza.com/ffmpeg"
 )
 
 type MemeArguments struct {

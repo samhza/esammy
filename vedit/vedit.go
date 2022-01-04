@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/kkdai/youtube/v2"
-	"go.samhza.com/esammy/memegen"
-	ff "go.samhza.com/ffmpeg"
-	"go.samhza.com/ytsearch"
+	"samhza.com/esammy/memegen"
+	ff "samhza.com/ffmpeg"
+	"samhza.com/ytsearch"
 )
 
 type Arguments struct {
