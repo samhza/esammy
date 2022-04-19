@@ -165,7 +165,6 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		if err != nil {
 			return err
 		}
-		defer out.Cleanup()
 		outopts := []string{"-f", format, "-shortest"}
 		fcmd.AddFileOutput(out.File, outopts, streams...)
 		cmd := fcmd.Cmd()

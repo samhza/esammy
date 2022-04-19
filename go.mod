@@ -8,6 +8,7 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gorilla/schema v1.2.0
 	github.com/kkdai/youtube/v2 v2.7.4
+	github.com/minio/minio-go/v7 v7.0.24
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
 	golang.org/x/image v0.0.0-20210504121937-7319ad40d33e

@@ -2,6 +2,8 @@ package discordbot
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -11,7 +13,7 @@ import (
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/sendpart"
-	"github.com/pkg/errors"
+	"github.com/minio/minio-go/v7"
 )
 
 // startWorking sends a "Working..." to inform the user that the bot is working
@@ -44,7 +46,15 @@ func (b *Bot) startWorking(ch discord.ChannelID, m discord.MessageID) func() {
 }
 
 func (b *Bot) createOutput(id discord.MessageID, ext string) (*outputFile, error) {
-	return createOutput(id, ext, b.cfg.OutputDir, b.cfg.OutputURL)
+	f, err := os.CreateTemp(b.cfg.OutputDir, "*."+ext)
+	if err != nil {
+		return nil, err
+	}
+	of := new(outputFile)
+	of.File = f
+	of.name = id.String() + "." + ext
+	of.bot = b
+	return of, err
 }
 
 // sendFile sends the contents of a reader into a channel. See outputFile for
@@ -70,7 +80,6 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 	if err != nil {
 		return err
 	}
-	defer out.Cleanup()
 	_, err = buf.WriteTo(out.File)
 	if err != nil {
 		return err
@@ -82,36 +91,21 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 	return out.Send(b.Ctx.Client, ch)
 }
 
-func createOutput(id discord.MessageID, ext,
-	dir, baseurl string) (*outputFile, error) {
-	f, err := os.CreateTemp("", id.String()+"."+ext)
-	if err != nil {
-		return nil, err
-	}
-	of := new(outputFile)
-	of.baseurl = baseurl
-	of.File = f
-	of.name = id.String() + "." + ext
-	if dir != "" {
-		of.moveto = path.Join(dir, of.name)
-	}
-	return of, err
-}
-
 // outputFile is a file that will be sent to Discord. If the file is small
 // enough, it will be sent as a file attachment and deleted. If the file is too
 // large, it will be moved to a file and sent as a link instead.
 type outputFile struct {
-	File    *os.File
-	name    string
-	moveto  string
-	baseurl string
-	moved   bool
-	keep    bool
+	File *os.File
+	name string
+	bot  *Bot
 }
 
 func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	f := s.File
+	defer func(name string) {
+		f.Close()
+		os.Remove(name)
+	}(f.Name())
 	stat, err := f.Stat()
 	if err != nil {
 		return err
@@ -122,35 +116,25 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 		})
 		return err
 	}
-	if s.moveto == "" || s.baseurl == "" {
-		return errors.New("file too large")
-	}
-	f.Close()
-	err = os.Rename(f.Name(), s.moveto)
-	if err != nil {
-		return err
-	}
-	err = os.Chmod(s.moveto, 0644)
-	if err != nil {
-		return err
-	}
-	s.moved = true
-	_, err = ctx.SendMessage(id, s.baseurl+s.name)
-	if err == nil {
-		s.keep = true
-	}
-	return err
-}
-
-// Cleanup deletes the file if it shouldn't be kept, or does nothing.
-func (s *outputFile) Cleanup() {
-	s.File.Close()
-	if s.keep {
-		return
-	}
-	if s.moved {
-		os.Remove(s.moveto)
+	var url string
+	if s.bot.cfg.S3Endpoint != "" {
+		f.Seek(0, 0)
+		_, err = s.bot.s3.PutObject(context.Background(), s.bot.cfg.S3Bucket, s.name, f, stat.Size(), minio.PutObjectOptions{})
+		if err != nil {
+			return err
+		}
+		url = s.bot.cfg.OutputURL + s.name
+	} else if s.bot.cfg.OutputDir != "" {
+		f.Close()
+		err = os.Rename(f.Name(), path.Join(s.bot.cfg.OutputDir+s.name))
+		if err != nil {
+			return err
+		}
+		url = s.bot.cfg.OutputURL + s.name
 	} else {
-		os.Remove(s.File.Name())
+		return errors.New("file too large and no S3/upload directory configured")
 	}
+
+	_, err = ctx.SendMessage(id, url)
+	return err
 }

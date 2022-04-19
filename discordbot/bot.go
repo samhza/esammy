@@ -1,6 +1,7 @@
 package discordbot
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,7 +9,8 @@ import (
 
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
-	"github.com/pkg/errors"
+	minio "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"samhza.com/esammy/tenor"
 	"samhza.com/esammy/vedit"
 	ff "samhza.com/ffmpeg"
@@ -21,12 +23,17 @@ type Bot struct {
 
 	httpClient *http.Client
 	tenor      *tenor.Client
+	s3         *minio.Client
 }
 
 type Config struct {
-	Tenor     string `toml:"tenor"`
-	OutputDir string `toml:"output-dir"`
-	OutputURL string `toml:"output-url"`
+	Tenor       string `toml:"tenor"`
+	OutputDir   string `toml:"output-dir"`
+	OutputURL   string `toml:"output-url"`
+	S3Endpoint  string `toml:"s3-endpoint"`
+	S3KeyID     string `toml:"s3-key-id"`
+	S3SecretKey string `toml:"s3-secret-key"`
+	S3Bucket    string `toml:"s3-bucket"`
 }
 
 func New(client *http.Client, cfg Config) *Bot {
@@ -34,6 +41,17 @@ func New(client *http.Client, cfg Config) *Bot {
 	if cfg.Tenor != "" {
 		b.tenor = tenor.NewClient(cfg.Tenor)
 		b.tenor.Client = client
+	}
+	if cfg.S3Endpoint != "" {
+		var err error
+		b.s3, err = minio.New(cfg.S3Endpoint,
+			&minio.Options{
+				Creds:  credentials.NewStaticV4(cfg.S3KeyID, cfg.S3SecretKey, ""),
+				Secure: true,
+			})
+		if err != nil {
+			panic(err)
+		}
 	}
 	return &b
 }
@@ -80,7 +98,6 @@ func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
-	defer out.Cleanup()
 	fcmd.AddFileOutput(out.File, []string{"-y", "-f", "gif"}, v)
 	err = fcmd.Cmd().Run()
 	if err != nil {
@@ -125,7 +142,6 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	if err != nil {
 		return err
 	}
-	defer out.Cleanup()
 	err = vedit.Process(args, itype, in, out.File)
 	if err != nil {
 		return err

@@ -127,7 +127,6 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 	if err != nil {
 		return err
 	}
-	defer out.Cleanup()
 	fcmd := new(ff.Cmd)
 	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outfmt}, streams...)
 	err = fcmd.Cmd().Run()
