@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -143,6 +144,69 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 		return err
 	}
 	err = vedit.Process(args, itype, in, out.File)
+	if err != nil {
+		return err
+	}
+	done()
+	return out.Send(bot.Ctx.Client, m.ChannelID)
+}
+
+func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
+	var cliplen []int
+	for _, arg := range args {
+		n, err := strconv.Atoi(arg)
+		if err != nil {
+			break
+		}
+		cliplen = append(cliplen, n)
+	}
+	fmt.Println(cliplen)
+	clips := args[len(cliplen):]
+	for _, att := range m.Attachments {
+		clips = append(clips, att.Proxy)
+	}
+	if len(clips) < 2 {
+		return errors.New("need at least 2 videos")
+	}
+	probed, err := ff.Probe(clips[0])
+	width, height := -1, -1
+	for _, stream := range probed.Streams {
+		if stream.CodecType == ff.CodecTypeVideo {
+			width = stream.Width
+			height = stream.Height
+			break
+		}
+	}
+	done := bot.startWorking(m.ChannelID, m.ID)
+	defer done()
+	out, err := bot.createOutput(m.ID, "mp4")
+	if err != nil {
+		return err
+	}
+	var inputs []ff.Stream
+	for i, arg := range clips {
+		input := ff.Input{Name: arg}
+		scaled := ff.Filter(ff.Video(input),
+			fmt.Sprintf("scale=%d:%d", width, height),
+		)
+		if i+1 <= len(cliplen) {
+			n := strconv.Itoa(cliplen[i])
+			inputs = append(inputs,
+				ff.Filter(scaled,
+					"trim=duration="+n),
+				ff.Filter(ff.Audio(input),
+					"atrim=duration="+n))
+		} else {
+			inputs = append(inputs, scaled, ff.Audio(input))
+		}
+	}
+	outs := ff.Concat(len(clips), 1, 1, inputs...)
+	fcmd := new(ff.Cmd)
+	if err != nil {
+		return err
+	}
+	fcmd.AddFileOutput(out.File, []string{"-y", "-f", "mp4"}, outs...)
+	err = fcmd.Cmd().Run()
 	if err != nil {
 		return err
 	}

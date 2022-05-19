@@ -237,7 +237,7 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 			part1 = ff.Filter(part1, fmt.Sprintf("atrim=end=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
 			part2 = ff.Filter(part2, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
 			part2 = ff.AMix(mus, part2)
-			a = ff.Concat(0, 1, part1, part2)[0]
+			a = ff.Concat(2, 0, 1, part1, part2)[0]
 		} else {
 			a = ff.AMix(mus, a)
 		}

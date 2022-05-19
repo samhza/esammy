@@ -13,9 +13,6 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-func init() {
-	log.SetFlags(0)
-}
 
 type config struct {
 	Token       string   `toml:"token"`
@@ -40,7 +37,6 @@ func main() {
 
 	httpClient := &http.Client{
 		Timeout: time.Duration(config.HTTPTimeout) * time.Millisecond}
-
 	dbot := discordbot.New(httpClient, config.Config)
 	wait, err := bot.Start(config.Token, dbot, func(ctx *bot.Context) error {
 		ctx.HasPrefix = bot.NewPrefix(config.Prefixes...)
