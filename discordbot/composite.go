@@ -129,6 +129,9 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		} else {
 			v = ff.Overlay(input, imginput, -pt.X, -pt.Y)
 		}
+		if media.Type == mediaGIFV {
+			v = ff.Filter(v, "fps=20")
+		}
 		if media.Type == mediaGIFV || media.Type == mediaGIF {
 			v = ff.Filter(v, "fps=20")
 			one, two := ff.Split(v)
@@ -169,6 +172,9 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		fcmd.AddFileOutput(out.File, outopts, streams...)
 		cmd := fcmd.Cmd()
 		cmd.Args = append(cmd.Args, "-y", "-loglevel", "error", "-shortest")
+		if media.Type == mediaGIF {
+			cmd.Args = append(cmd.Args, "-vsync", "0")
+		}
 		stderr := &bytes.Buffer{}
 		cmd.Stderr = stderr
 		err = cmd.Run()
