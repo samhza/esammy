@@ -13,7 +13,6 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-
 type config struct {
 	Token       string   `toml:"token"`
 	HTTPTimeout int      `toml:"http-timeout" default:"30000"`
@@ -46,8 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	log.Println("Bot started")
+	log.Println("Bot logged in as %s#%s (%s)")
 
 	if err := wait(); err != nil {
 		log.Fatalln("Gateway fatal error:", err)

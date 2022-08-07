@@ -17,5 +17,3 @@ require (
 	samhza.com/gg v1.3.1-0.20210316180522-5c6054f09523
 	samhza.com/ytsearch v0.0.0-20220104160835-a0930e67ff04
 )
-
-replace samhza.com/ffmpeg => ../go-ffmpeg
