@@ -237,7 +237,7 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 			part1 = ff.Filter(part1, fmt.Sprintf("atrim=end=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
 			part2 = ff.Filter(part2, fmt.Sprintf("atrim=start=%f,asetpts=PTS-STARTPTS", arg.musicdelay))
 			part2 = ff.AMix(mus, part2)
-			a = ff.Concat(2, 0, 1, part1, part2)[0]
+			a = ff.Concat(0, 1, part1, part2)[0]
 		} else {
 			a = ff.AMix(mus, a)
 		}
@@ -306,7 +306,7 @@ func Process(arg Arguments, itype InputType, in, out *os.File) error {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			return fmt.Errorf("exit status %d: %s",
-				exitError.ExitCode(), string(stderr.String()))
+				exitError.ExitCode(), stderr.String())
 		}
 		return err
 	}
@@ -325,44 +325,6 @@ func imageInput(img image.Image) (stream ff.Stream, cancel func(), err error) {
 	}()
 	imginput := ff.InputFile{File: pR}
 	return imginput, func() { pR.Close() }, nil
-}
-
-func probeSize(file *os.File) (width, height int, err error) {
-	cmd := exec.Command(
-		"ffprobe",
-		"-v", "quiet",
-		"-read_intervals", "%+#1", // 1 frame only
-		"-select_streams", "v:0",
-		"-print_format", "default=noprint_wrappers=1",
-		"-show_entries", "stream=width,height", "pipe:3",
-	)
-	cmd.ExtraFiles = []*os.File{file}
-
-	b, err := cmd.Output()
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to execute FFprobe: %w", err)
-	}
-
-	for _, t := range bytes.Fields(b) {
-		p := bytes.Split(t, []byte("="))
-		if len(p) != 2 {
-			return 0, 0, fmt.Errorf("invalid line: %q", t)
-		}
-		v := strings.Split(string(p[1]), "/")[0]
-		i, err := strconv.Atoi(v)
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to parse int from line %q: %w", t, err)
-		}
-
-		switch string(p[0]) {
-		case "width":
-			width = i
-		case "height":
-			height = i
-		}
-	}
-
-	return width, height, nil
 }
 
 func getMusicURL(music string) (string, error) {

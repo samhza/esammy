@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/arikawa/v3/state"
 	"io"
 	"os"
 	"path"
+	"samhza.com/esammy/bot/plugin"
 	"sync"
 	"time"
 
-	"github.com/diamondburned/arikawa/v3/api"
-	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/sendpart"
 	"github.com/minio/minio-go/v7"
 )
@@ -20,24 +21,22 @@ import (
 // on generating the output. The returned function must be called to delete the
 // "Working..." message. The returned function may be called more than once, any
 // calls after the first will be ignored.
-func (b *Bot) startWorking(ch discord.ChannelID, m discord.MessageID) func() {
+func (bot *Bot) startWorking(r plugin.Replier) func() {
 	done := make(chan struct{})
 	timer := time.NewTimer(500 * time.Millisecond)
 	go func() {
-		var msg *discord.Message
 		var err error
 		select {
 		case <-done:
 			timer.Stop()
 			return
 		case <-timer.C:
-			msg, err = b.Ctx.SendTextReply(ch, "Working...", m)
+			err = r.Defer()
 		}
 		<-done
 		if err != nil {
 			return
 		}
-		b.Ctx.DeleteMessage(ch, msg.ID, "")
 	}()
 	var once sync.Once
 	return func() {
@@ -45,22 +44,21 @@ func (b *Bot) startWorking(ch discord.ChannelID, m discord.MessageID) func() {
 	}
 }
 
-func (b *Bot) createOutput(id discord.MessageID, ext string) (*outputFile, error) {
-	f, err := os.CreateTemp(b.cfg.OutputDir, "*."+ext)
+func (bot *Bot) createOutput(id discord.Snowflake, ext string) (*outputFile, error) {
+	f, err := os.CreateTemp(bot.cfg.OutputDir, "*."+ext)
 	if err != nil {
 		return nil, err
 	}
 	of := new(outputFile)
 	of.File = f
 	of.name = id.String() + "." + ext
-	of.bot = b
+	of.bot = bot
 	return of, err
 }
 
 // sendFile sends the contents of a reader into a channel. See outputFile for
 // more information.
-func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
-	ext string, src io.Reader) error {
+func (bot *Bot) sendFile(s *state.State, ctx *plugin.Context, ext string, src io.Reader) error {
 	buf := new(bytes.Buffer) // TODO sync.Pool of buffers?
 	lr := &io.LimitedReader{R: src, N: 8000000}
 	_, err := buf.ReadFrom(lr)
@@ -68,15 +66,11 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 		return err
 	}
 	if lr.N > 0 {
-		_, err := b.Ctx.SendMessageComplex(ch, api.SendMessageData{
-			Reference: &discord.MessageReference{
-				MessageID: mid,
-			},
-			Files: []sendpart.File{{Name: mid.String() + "." + ext, Reader: buf}},
+		return ctx.Replier.Respond(plugin.ReplyData{
+			Files: []sendpart.File{{Name: ctx.ID.String() + "." + ext, Reader: buf}},
 		})
-		return err
 	}
-	out, err := b.createOutput(mid, ext)
+	out, err := bot.createOutput(ctx.ID, ext)
 	if err != nil {
 		return err
 	}
@@ -88,7 +82,7 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 	if err != nil {
 		return err
 	}
-	return out.Send(b.Ctx.Client, ch)
+	return out.Send(ctx.Replier)
 }
 
 // outputFile is a file that will be sent to Discord. If the file is small
@@ -100,7 +94,7 @@ type outputFile struct {
 	bot  *Bot
 }
 
-func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
+func (s *outputFile) Send(r plugin.Replier) error {
 	f := s.File
 	defer func(name string) {
 		f.Close()
@@ -111,10 +105,9 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 		return err
 	}
 	if stat.Size() <= 8000000 {
-		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
+		return r.Respond(plugin.ReplyData{
 			Files: []sendpart.File{{Name: s.name, Reader: f}},
 		})
-		return err
 	}
 	var url string
 	if s.bot.cfg.S3Endpoint != "" {
@@ -134,7 +127,7 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	} else {
 		return errors.New("file too large and no S3/upload directory configured")
 	}
-
-	_, err = ctx.SendMessage(id, url)
-	return err
+	return r.Reply(plugin.ReplyData{
+		Content: url,
+	})
 }

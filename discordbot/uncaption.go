@@ -3,6 +3,7 @@ package discordbot
 import (
 	"bytes"
 	"errors"
+	"github.com/diamondburned/arikawa/v3/state"
 	"image"
 	"image/color"
 	"image/gif"
@@ -10,24 +11,21 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"samhza.com/esammy/bot/plugin"
 	"strconv"
 
-	"github.com/diamondburned/arikawa/v3/gateway"
 	ff "samhza.com/ffmpeg"
 )
 
 // TODO: split Uncaption into multiple functions
 
-func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
-	media, err := bot.findMedia(m.Message)
-	if err != nil {
-		return err
-	}
+func (bot *Bot) cmdUncaption(s *state.State, ctx *plugin.Context) (any, error) {
+	media := ctx.Options["media"].(Media)
 	resp, err := http.Get(media.URL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	done := bot.startWorking(m.ChannelID, m.ID)
+	done := bot.startWorking(ctx.Replier)
 	defer done()
 	defer resp.Body.Close()
 	switch media.Type {
@@ -35,11 +33,11 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 		im, _, err := image.Decode(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		newMinY, found := detectCaption(im)
 		if !found {
-			return errors.New("couldn't find the caption")
+			return nil, errors.New("couldn't find the caption")
 		}
 		b := im.Bounds()
 		b.Min.Y = newMinY
@@ -51,16 +49,16 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			w.Close()
 		}()
 		done()
-		return bot.sendFile(m.ChannelID, m.ID, "png", r)
+		return nil, bot.sendFile(s, ctx, "png", r)
 	case mediaGIF:
 		dgif, err := gif.DecodeAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		newMinY, found := detectCaption(dgif.Image[0])
 		if !found {
-			return errors.New("couldn't find the caption")
+			return nil, errors.New("couldn't find the caption")
 		}
 		bounds := dgif.Image[0].Rect
 		bounds.Min.Y = newMinY
@@ -75,28 +73,28 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			w.CloseWithError(gif.EncodeAll(w, dgif))
 		}()
 		done()
-		return bot.sendFile(m.ChannelID, m.ID, "gif", r)
+		return nil, bot.sendFile(s, ctx, "gif", r)
 	}
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.Remove(in.Name())
 	defer in.Close()
 	firstFrame, err := firstVidFrame(in.Name())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	newMinY, found := detectCaption(firstFrame)
 	if !found {
-		return errors.New("couldn't find the caption")
+		return nil, errors.New("couldn't find the caption")
 	}
 	var instream ff.Stream = ff.InputFile{File: in}
 
 	probed, err := ff.Probe(in.Name())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var hasAudio bool
 	for _, stream := range probed.Streams {
@@ -123,18 +121,18 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			streams = append(streams, ff.Audio(instream))
 		}
 	}
-	out, err := bot.createOutput(m.ID, outfmt)
+	out, err := bot.createOutput(ctx.ID, outfmt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fcmd := new(ff.Cmd)
 	fcmd.AddFileOutput(out.File, []string{"-y", "-f", outfmt}, streams...)
 	err = fcmd.Cmd().Run()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	done()
-	return out.Send(bot.Ctx.Client, m.ChannelID)
+	return nil, out.Send(ctx.Replier)
 }
 
 func firstVidFrame(filename string) (image.Image, error) {

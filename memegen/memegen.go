@@ -8,9 +8,9 @@ import (
 	"unicode"
 
 	"github.com/golang/freetype/truetype"
-	"samhza.com/gg"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
+	"samhza.com/gg"
 )
 
 var impactFont, captionFont, timesFont *truetype.Font
@@ -230,19 +230,6 @@ func Motivate(w, h int, top, bot string) (image.Image, image.Point) {
 	}
 
 	return dc.Image(), image.Point{-padding, -padding}
-}
-
-func drawOutlinedText(dc *gg.Context, s string,
-	x, y, ax, ay, width float64, sp float64) {
-	dc.SetRGB(0, 0, 0)
-	n := dc.FontHeight() / 20
-	w := width * .95
-	dc.DrawStringWrapped(s, x+n, y+n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x-n, y-n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x+n, y-n, ax, ay, w, sp, gg.AlignCenter)
-	dc.DrawStringWrapped(s, x-n, y+n, ax, ay, w, sp, gg.AlignCenter)
-	dc.SetRGB(1, 1, 1)
-	dc.DrawStringWrapped(s, x, y, ax, ay, w, sp, gg.AlignCenter)
 }
 
 func limitWrappedTextHeight(dc *gg.Context,

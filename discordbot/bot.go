@@ -3,22 +3,26 @@ package discordbot
 import (
 	"errors"
 	"fmt"
+	"github.com/diamondburned/arikawa/v3/state"
 	"io"
 	"net/http"
 	"os"
+	"samhza.com/esammy/bot/command"
+	"samhza.com/esammy/bot/option"
+	"samhza.com/esammy/bot/plugin"
+	ff "samhza.com/ffmpeg"
 	"strconv"
+	"strings"
 
-	"github.com/diamondburned/arikawa/v3/bot"
-	"github.com/diamondburned/arikawa/v3/gateway"
-	minio "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"samhza.com/esammy/bot"
 	"samhza.com/esammy/tenor"
 	"samhza.com/esammy/vedit"
-	ff "samhza.com/ffmpeg"
 )
 
 type Bot struct {
-	Ctx *bot.Context
+	Router *bot.Router
 
 	cfg Config
 
@@ -37,12 +41,44 @@ type Config struct {
 	S3Bucket    string `toml:"s3-bucket"`
 }
 
-func New(client *http.Client, cfg Config) *Bot {
-	b := Bot{Ctx: nil, httpClient: client, cfg: cfg}
+func New(client *http.Client, state *state.State, cfg Config) (*Bot, error) {
+	b := Bot{httpClient: client, cfg: cfg}
 	if cfg.Tenor != "" {
 		b.tenor = tenor.NewClient(cfg.Tenor)
 		b.tenor.Client = client
 	}
+	app, err := state.CurrentApplication()
+	if err != nil {
+		return nil, err
+	}
+	b.Router, err = bot.New(bot.Options{
+		State: state,
+		AppID: app.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	b.Router.AddCommand(command.New(b.cmdCaption, "caption", "caption",
+		WithMedia{RawString{"text", "caption text"}, &b},
+	))
+	b.Router.AddCommand(command.New(b.cmdConcat, "concat", "concat",
+		RawString{"videos", "space-seperated links to videos to concat"}))
+	b.Router.AddCommand(command.New(b.cmdEdit, "edit", "edit",
+		WithMedia{RawString{"edits", "edits to perform on video"}, &b},
+	))
+	b.Router.AddCommand(command.New(b.cmdGif, "gif", "gif",
+		WithMedia{option.None{}, &b},
+	))
+	b.Router.AddCommand(command.New(b.cmdMeme, "meme", "meme",
+		WithMedia{MemeArguments{}, &b},
+	))
+	b.Router.AddCommand(command.New(b.cmdMotivate, "motivate", "motivate",
+		WithMedia{MemeArguments{}, &b},
+	))
+	b.Router.AddCommand(command.New(b.cmdUncaption, "uncaption", "uncaption",
+		WithMedia{option.None{}, &b},
+	))
+
 	if cfg.S3Endpoint != "" {
 		var err error
 		b.s3, err = minio.New(cfg.S3Endpoint,
@@ -54,70 +90,51 @@ func New(client *http.Client, cfg Config) *Bot {
 			panic(err)
 		}
 	}
-	return &b
+	return &b, nil
 }
 
-func (b *Bot) Ping(m *gateway.MessageCreateEvent) error {
-	msg, err := b.Ctx.SendMessage(m.ChannelID, "Pong!")
-	if err != nil {
-		return err
-	}
-	ping := msg.Timestamp.Time().Sub(m.Timestamp.Time())
-	response := fmt.Sprintf("Pong! (Response time: `%s`)", ping)
-	_, err = b.Ctx.EditMessage(m.ChannelID, msg.ID, response)
-	return err
-}
-
-func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
-	media, err := bot.findMedia(m.Message)
-	if err != nil {
-		return err
-	}
+func (bot *Bot) cmdGif(s *state.State, ctx *plugin.Context) (any, error) {
+	media := ctx.Options["media"].(Media)
 	if media.Type != mediaVideo {
-		return errors.New("this isn't a video")
+		return nil, errors.New("this isn't a video")
 	}
 	resp, err := http.Get(media.URL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	done := bot.startWorking(m.ChannelID, m.ID)
+	done := bot.startWorking(ctx.Replier)
 	defer done()
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.Remove(in.Name())
 	defer in.Close()
-	var v ff.Stream = ff.Video(ff.InputFile{File: in})
+	var v = ff.Video(ff.InputFile{File: in})
 	v = ff.Filter(v, "fps=20")
 	one, two := ff.Split(v)
 	palette := ff.PaletteGen(two)
 	v = ff.PaletteUse(one, palette)
 	fcmd := new(ff.Cmd)
-	out, err := bot.createOutput(m.ID, "gif")
+	out, err := bot.createOutput(ctx.ID, "gif")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fcmd.AddFileOutput(out.File, []string{"-y", "-f", "gif"}, v)
 	err = fcmd.Cmd().Run()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return out.Send(bot.Ctx.Client, m.ChannelID)
+	return nil, out.Send(ctx.Replier)
 }
 
-type editArguments vedit.Arguments
-
-func (e *editArguments) CustomParse(arg string) error {
-	return (*vedit.Arguments)(e).Parse(arg)
-}
-
-func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
-	args := (vedit.Arguments)(cmd)
-	media, err := bot.findMedia(m.Message)
-	if err != nil {
-		return err
+func (bot *Bot) cmdEdit(s *state.State, ctx *plugin.Context) (any, error) {
+	media := ctx.Options["media"].(Media)
+	edits := ctx.Options["edits"].(string)
+	var args vedit.Arguments
+	if err := args.Parse(edits); err != nil {
+		return nil, err
 	}
 	var itype vedit.InputType
 	switch media.Type {
@@ -128,31 +145,33 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	}
 	resp, err := bot.httpClient.Get(media.URL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	done := bot.startWorking(m.ChannelID, m.ID)
+	done := bot.startWorking(ctx.Replier)
 	defer done()
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.Remove(in.Name())
 	defer in.Close()
-	out, err := bot.createOutput(m.ID, "mp4")
+	out, err := bot.createOutput(ctx.ID, "mp4")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = vedit.Process(args, itype, in, out.File)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	done()
-	return out.Send(bot.Ctx.Client, m.ChannelID)
+	return nil, out.Send(ctx.Replier)
 }
 
-func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
+func (bot *Bot) cmdConcat(s *state.State, ctx *plugin.Context) (any, error) {
+	videos := ctx.Options["videos"].(string)
 	var cliplen []int
+	args := strings.Split(videos, " ")
 	for _, arg := range args {
 		n, err := strconv.Atoi(arg)
 		if err != nil {
@@ -162,11 +181,8 @@ func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
 	}
 	fmt.Println(cliplen)
 	clips := args[len(cliplen):]
-	for _, att := range m.Attachments {
-		clips = append(clips, att.Proxy)
-	}
 	if len(clips) < 2 {
-		return errors.New("need at least 2 videos")
+		return nil, errors.New("need at least 2 videos")
 	}
 	probed, err := ff.Probe(clips[0])
 	width, height := -1, -1
@@ -177,11 +193,11 @@ func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
 			break
 		}
 	}
-	done := bot.startWorking(m.ChannelID, m.ID)
+	done := bot.startWorking(ctx.Replier)
 	defer done()
-	out, err := bot.createOutput(m.ID, "mp4")
+	out, err := bot.createOutput(ctx.ID, "mp4")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var inputs []ff.Stream
 	for i, arg := range clips {
@@ -200,18 +216,18 @@ func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
 			inputs = append(inputs, scaled, ff.Audio(input))
 		}
 	}
-	outs := ff.Concat(len(clips), 1, 1, inputs...)
+	outs := ff.Concat(1, 1, inputs...)
 	fcmd := new(ff.Cmd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fcmd.AddFileOutput(out.File, []string{"-y", "-f", "mp4"}, outs...)
 	err = fcmd.Cmd().Run()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	done()
-	return out.Send(bot.Ctx.Client, m.ChannelID)
+	return nil, out.Send(ctx.Replier)
 }
 
 func downloadInput(body io.Reader) (*os.File, error) {

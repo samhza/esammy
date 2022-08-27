@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"github.com/diamondburned/arikawa/v3/gateway"
+	"github.com/diamondburned/arikawa/v3/state"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	"samhza.com/esammy/discordbot"
 
-	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/pelletier/go-toml"
 )
 
@@ -36,18 +39,25 @@ func main() {
 
 	httpClient := &http.Client{
 		Timeout: time.Duration(config.HTTPTimeout) * time.Millisecond}
-	dbot := discordbot.New(httpClient, config.Config)
-	wait, err := bot.Start(config.Token, dbot, func(ctx *bot.Context) error {
-		ctx.HasPrefix = bot.NewPrefix(config.Prefixes...)
-		ctx.SilentUnknown.Command = true
-		return nil
-	})
+	s := state.New("Bot " + config.Token)
+	s.AddIntents(gateway.IntentGuildMessages)
+	bot, err := discordbot.New(httpClient, s, config.Config)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println("Bot logged in as %s#%s (%s)")
-
-	if err := wait(); err != nil {
-		log.Fatalln("Gateway fatal error:", err)
+	err = bot.Router.RegisterGuildCommands(1010039901410054214)
+	if err != nil {
+		log.Fatalln(err)
 	}
+	s.Open(context.Background())
+	self, err := s.Me()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Printf("Bot logged in as %s#%s (%s)\n", self.Username, self.Discriminator, self.ID)
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, os.Kill)
+	<-sigs
+	s.Close()
 }

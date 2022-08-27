@@ -1,20 +1,18 @@
 package discordbot
 
 import (
+	"github.com/diamondburned/arikawa/v3/state"
 	"mime"
 	"path"
 	"strings"
 
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/pkg/errors"
 	"samhza.com/esammy/tenor"
 )
 
 type Media struct {
-	URL    string
-	Height int
-	Width  int
-	Type   mediaType
+	URL  string
+	Type mediaType
 }
 
 type mediaType int
@@ -26,70 +24,62 @@ const (
 	mediaGIF
 )
 
-func (b *Bot) findMedia(m discord.Message) (*Media, error) {
-	media := b.getMsgMedia(m)
+func (bot *Bot) findMsgMedia(s *state.State, m discord.Message) *Media {
+	media := bot.getMsgMedia(m)
 	if media != nil {
-		return media, nil
+		return media
 	}
 	if m.Type == discord.InlinedReplyMessage && m.ReferencedMessage != nil {
-		media = b.getMsgMedia(*m.ReferencedMessage)
+		media = bot.getMsgMedia(*m.ReferencedMessage)
 		if media != nil {
-			return media, nil
+			return media
 		}
 	}
-	msgs, err := b.Ctx.Client.Messages(m.ChannelID, 20)
+	msgs, err := s.Messages(m.ChannelID, 20)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	for _, m := range msgs {
-		media = b.getMsgMedia(m)
+		media = bot.getMsgMedia(m)
 		if media != nil {
-			return media, nil
+			return media
 		}
 	}
-	return nil, errors.New("no media found")
+	return nil
 }
 
-func (b *Bot) getMsgMedia(m discord.Message) *Media {
+func (bot *Bot) getMsgMedia(m discord.Message) *Media {
 	for _, at := range m.Attachments {
 		if at.Height == 0 {
 			continue
 		}
 		ext := path.Ext(at.Proxy)
 		m := &Media{
-			URL:    at.Proxy,
-			Height: int(at.Height),
-			Width:  int(at.Width),
-			Type:   mediaTypeByExt(ext),
+			URL:  at.Proxy,
+			Type: mediaTypeByExt(ext),
 		}
 		return m
 	}
 	for _, em := range m.Embeds {
 		if em.Type == discord.VideoEmbed && em.Provider == nil {
 			return &Media{
-				URL:    em.Video.URL,
-				Height: int(em.Video.Height),
-				Width:  int(em.Video.Width),
-				Type:   mediaVideo,
+				URL:  em.Video.URL,
+				Type: mediaVideo,
 			}
 		}
 		if em.Type == discord.ImageEmbed {
 			m := &Media{
-				URL:    em.Thumbnail.Proxy,
-				Height: int(em.Thumbnail.Height),
-				Width:  int(em.Thumbnail.Width),
+				URL: em.Thumbnail.Proxy,
 			}
 			m.Type = mediaTypeByExt(path.Ext(m.URL))
 			return m
 		}
 		if em.Type == discord.GIFVEmbed {
 			m := &Media{
-				Height: int(em.Video.Height),
-				Width:  int(em.Video.Width),
-				URL:    em.Video.URL,
-				Type:   mediaGIFV,
+				URL:  em.Video.URL,
+				Type: mediaGIFV,
 			}
-			if gif := b.gifURL(em.Video.URL); gif != "" {
+			if gif := bot.gifURL(em.Video.URL); gif != "" {
 				m.URL = gif
 				m.Type = mediaGIF
 			}
@@ -112,12 +102,12 @@ func mediaTypeByExt(ext string) mediaType {
 	return mediaImage
 }
 
-func (b *Bot) gifURL(gifvURL string) string {
+func (bot *Bot) gifURL(gifvURL string) string {
 	switch {
-	case strings.HasPrefix(gifvURL, "https://tenor.com") && b.tenor != nil:
+	case strings.HasPrefix(gifvURL, "https://tenor.com") && bot.tenor != nil:
 		split := strings.Split(gifvURL, "-")
 		id := split[len(split)-1]
-		gifs, err := b.tenor.GIFs([]string{id}, tenor.MediaFilterBasic, 1)
+		gifs, err := bot.tenor.GIFs([]string{id}, tenor.MediaFilterBasic, 1)
 		if err != nil || len(gifs) < 1 {
 			break
 		}
