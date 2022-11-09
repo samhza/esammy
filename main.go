@@ -45,10 +45,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	self, err := s.Me()
-	if err != nil {
-		log.Fatalln(err)
-	}
 	log.Println("Bot started")
 
 	if err := wait(); err != nil {
