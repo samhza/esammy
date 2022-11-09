@@ -200,7 +200,7 @@ func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
 			inputs = append(inputs, scaled, ff.Audio(input))
 		}
 	}
-	outs := ff.Concat(len(clips), 1, 1, inputs...)
+	outs := ff.Concat(1, 1, inputs...)
 	fcmd := new(ff.Cmd)
 	if err != nil {
 		return err

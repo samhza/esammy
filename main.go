@@ -45,7 +45,11 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println("Bot logged in as %s#%s (%s)")
+	self, err := s.Me()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("Bot started")
 
 	if err := wait(); err != nil {
 		log.Fatalln("Gateway fatal error:", err)
