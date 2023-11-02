@@ -11,7 +11,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.24
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	golang.org/x/image v0.0.0-20210504121937-7319ad40d33e
+	golang.org/x/image v0.10.0
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	samhza.com/ffmpeg v0.0.0-20220104160918-b1bc70395af8
 	samhza.com/gg v1.3.1-0.20210316180522-5c6054f09523
