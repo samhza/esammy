@@ -2,6 +2,7 @@ package discordbot
 
 import (
 	"mime"
+	"net/url"
 	"path"
 	"strings"
 
@@ -55,7 +56,11 @@ func (b *Bot) getMsgMedia(m discord.Message) *Media {
 		if at.Height == 0 {
 			continue
 		}
-		ext := path.Ext(at.Proxy)
+		url, _ := url.Parse(at.Proxy)
+		if url == nil {
+			continue
+		}
+		ext := path.Ext(url.Path)
 		m := &Media{
 			URL:    at.Proxy,
 			Height: int(at.Height),
