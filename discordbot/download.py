@@ -25,8 +25,9 @@ class MyLogger:
 url = sys.argv[1]
 
 def filter(info, *, incomplete):
-    live_status = info.get('live_status')
-    if live_status != "not_live":
+    is_live = info.get('is_live')
+    was_live = info.get('was_live')
+    if is_live or was_live:
         return 'This is/was a livestream'
     duration = info.get('duration')
     if duration and duration > 60 * 10:
