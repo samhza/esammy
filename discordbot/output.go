@@ -16,6 +16,8 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
+const MaxFileSize = 26214400
+
 // startWorking sends a "Working..." to inform the user that the bot is working
 // on generating the output. The returned function must be called to delete the
 // "Working..." message. The returned function may be called more than once, any
@@ -110,7 +112,7 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	if err != nil {
 		return err
 	}
-	if stat.Size() <= 8000000 {
+	if stat.Size() <= MaxFileSize {
 		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
 			Files: []sendpart.File{{Name: s.name, Reader: f}},
 		})
