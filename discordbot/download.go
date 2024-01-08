@@ -1,8 +1,6 @@
 package discordbot
 
 import (
-	"bytes"
-	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -13,9 +11,6 @@ import (
 	"github.com/diamondburned/arikawa/v3/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
 )
-
-//go:embed download.py
-var downloadScript []byte
 
 func (b *Bot) Download(m *gateway.MessageCreateEvent, args bot.RawArguments) error {
 	done := b.startWorking(m.ChannelID, m.ID)
@@ -34,7 +29,6 @@ func (b *Bot) Download(m *gateway.MessageCreateEvent, args bot.RawArguments) err
 		"--",
 		string(args))
 	stderr := strings.Builder{}
-	cmd.Stdin = bytes.NewReader(downloadScript)
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil || len(out) == 0 {
