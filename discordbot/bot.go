@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/diamondburned/arikawa/v3/bot"
+	"github.com/diamondburned/arikawa/v3/utils/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/diamondburned/arikawa/v3/bot"
+	"github.com/diamondburned/arikawa/v3/utils/bot"
 	"github.com/diamondburned/arikawa/v3/gateway"
 )
 
