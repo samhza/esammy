@@ -47,24 +47,27 @@ func (b *Bot) startWorking(ch discord.ChannelID, m discord.MessageID) func() {
 	}
 }
 
-func (b *Bot) createOutput(id discord.MessageID, ext string) (*outputFile, error) {
-	f, err := os.CreateTemp(b.cfg.OutputDir, "*."+ext)
+func (b *Bot) createOutput(id discord.MessageID, name string, ext string) (*outputFile, error) {
+	f, err := os.CreateTemp(b.cfg.OutputDir, "*")
 	if err != nil {
 		return nil, err
 	}
-	of := new(outputFile)
-	of.File = f
-	of.name = id.String() + "." + ext
-	of.bot = b
+	of := &outputFile{
+		File: f,
+		mid:  id,
+		name: name,
+		ext:  ext,
+		bot:  b,
+	}
 	return of, err
 }
 
 // sendFile sends the contents of a reader into a channel. See outputFile for
 // more information.
 func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
-	ext string, src io.Reader) error {
+	name, ext string, src io.Reader) error {
 	buf := new(bytes.Buffer) // TODO sync.Pool of buffers?
-	lr := &io.LimitedReader{R: src, N: 8000000}
+	lr := &io.LimitedReader{R: src, N: MaxFileSize}
 	_, err := buf.ReadFrom(lr)
 	if err != nil {
 		return err
@@ -74,11 +77,11 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 			Reference: &discord.MessageReference{
 				MessageID: mid,
 			},
-			Files: []sendpart.File{{Name: mid.String() + "." + ext, Reader: buf}},
+			Files: []sendpart.File{{Name: name + ext, Reader: buf}},
 		})
 		return err
 	}
-	out, err := b.createOutput(mid, ext)
+	out, err := b.createOutput(mid, name, ext)
 	if err != nil {
 		return err
 	}
@@ -98,7 +101,9 @@ func (b *Bot) sendFile(ch discord.ChannelID, mid discord.MessageID,
 // large, it will be moved to a file and sent as a link instead.
 type outputFile struct {
 	File *os.File
+	mid  discord.MessageID
 	name string
+	ext  string
 	bot  *Bot
 }
 
@@ -114,25 +119,30 @@ func (s *outputFile) Send(ctx *api.Client, id discord.ChannelID) error {
 	}
 	if stat.Size() <= MaxFileSize {
 		_, err = ctx.SendMessageComplex(id, api.SendMessageData{
-			Files: []sendpart.File{{Name: s.name, Reader: f}},
+			Reference: &discord.MessageReference{
+				MessageID: s.mid,
+			},
+			Files: []sendpart.File{{Name: s.name + s.ext, Reader: f}},
 		})
 		return err
 	}
 	var url string
 	if s.bot.cfg.S3Endpoint != "" {
+		s3name := s.mid.String() + "/" + s.name + s.ext
 		f.Seek(0, 0)
-		_, err = s.bot.s3.PutObject(context.Background(), s.bot.cfg.S3Bucket, s.name, f, stat.Size(), minio.PutObjectOptions{})
+		_, err = s.bot.s3.PutObject(context.Background(), s.bot.cfg.S3Bucket, s3name, f, stat.Size(), minio.PutObjectOptions{})
 		if err != nil {
 			return err
 		}
-		url = s.bot.cfg.OutputURL + s.name
+		url = s.bot.cfg.OutputURL + s3name
 	} else if s.bot.cfg.OutputDir != "" {
 		f.Close()
-		err = os.Rename(f.Name(), path.Join(s.bot.cfg.OutputDir+s.name))
+		diskname := s.mid.String() + s.ext
+		err = os.Rename(f.Name(), path.Join(s.bot.cfg.OutputDir, diskname))
 		if err != nil {
 			return err
 		}
-		url = s.bot.cfg.OutputURL + s.name
+		url = s.bot.cfg.OutputURL + diskname
 	} else {
 		return errors.New("file too large and no S3/upload directory configured")
 	}

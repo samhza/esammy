@@ -41,6 +41,7 @@ func (b *Bot) Download(m *gateway.MessageCreateEvent, args bot.RawArguments) err
 	}
 	of := new(outputFile)
 	of.File = f
+	of.mid = m.ID
 	of.name = m.ID.String() + "." + ext
 	of.bot = b
 	return of.Send(b.Ctx.Client, m.ChannelID)

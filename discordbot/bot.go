@@ -95,7 +95,7 @@ func (bot *Bot) Gif(m *gateway.MessageCreateEvent) error {
 	palette := ff.PaletteGen(two)
 	v = ff.PaletteUse(one, palette)
 	fcmd := new(ff.Cmd)
-	out, err := bot.createOutput(m.ID, "gif")
+	out, err := bot.createOutput(m.ID, "gif", ".gif")
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func (bot *Bot) Edit(m *gateway.MessageCreateEvent, cmd editArguments) error {
 	}
 	defer os.Remove(in.Name())
 	defer in.Close()
-	out, err := bot.createOutput(m.ID, "mp4")
+	out, err := bot.createOutput(m.ID, "edit", ".mp4")
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (bot *Bot) Concat(m *gateway.MessageCreateEvent, args ...string) error {
 	}
 	done := bot.startWorking(m.ChannelID, m.ID)
 	defer done()
-	out, err := bot.createOutput(m.ID, "mp4")
+	out, err := bot.createOutput(m.ID, "combined", ".mp4")
 	if err != nil {
 		return err
 	}

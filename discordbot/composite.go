@@ -38,7 +38,7 @@ func (m *MemeArguments) CustomParse(args string) error {
 }
 
 func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) error {
-	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
+	return bot.composite(m.Message, "meme", func(w, h int) (image.Image, image.Point, bool) {
 		m := image.NewRGBA(image.Rect(0, 0, w, h))
 		memegen.Impact(m, args.Top, args.Bottom)
 		return m, image.Point{}, false
@@ -46,14 +46,14 @@ func (bot *Bot) Meme(m *gateway.MessageCreateEvent, args MemeArguments) error {
 }
 
 func (bot *Bot) Motivate(m *gateway.MessageCreateEvent, args MemeArguments) error {
-	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
+	return bot.composite(m.Message, "motivate", func(w, h int) (image.Image, image.Point, bool) {
 		img, pt := memegen.Motivate(w, h, args.Top, args.Bottom)
 		return img, pt, true
 	})
 }
 
 func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) error {
-	return bot.composite(m.Message, func(w, h int) (image.Image, image.Point, bool) {
+	return bot.composite(m.Message, "caption", func(w, h int) (image.Image, image.Point, bool) {
 		img, pt := memegen.Caption(w, h, string(raw))
 		return img, pt, true
 	})
@@ -61,7 +61,7 @@ func (bot *Bot) Caption(m *gateway.MessageCreateEvent, raw bot.RawArguments) err
 
 type compositeFunc func(int, int) (image.Image, image.Point, bool)
 
-func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
+func (bot *Bot) composite(m discord.Message, name string, imgfn compositeFunc) error {
 	media, err := bot.findMedia(m)
 	if err != nil {
 		return err
@@ -99,7 +99,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 			w.Close()
 		}()
 		done()
-		return bot.sendFile(m.ChannelID, m.ID, "png", r)
+		return bot.sendFile(m.ChannelID, m.ID, name, ".png", r)
 	} else {
 		in, err := downloadInput(resp.Body)
 		resp.Body.Close()
@@ -164,7 +164,7 @@ func (bot *Bot) composite(m discord.Message, imgfn compositeFunc) error {
 		case mediaGIFV, mediaGIF:
 			format = "gif"
 		}
-		out, err := bot.createOutput(m.ID, format)
+		out, err := bot.createOutput(m.ID, name, "."+format)
 		if err != nil {
 			return err
 		}

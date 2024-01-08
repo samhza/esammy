@@ -51,7 +51,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			w.Close()
 		}()
 		done()
-		return bot.sendFile(m.ChannelID, m.ID, "png", r)
+		return bot.sendFile(m.ChannelID, m.ID, "uncaption", ".png", r)
 	case mediaGIF:
 		dgif, err := gif.DecodeAll(resp.Body)
 		resp.Body.Close()
@@ -75,7 +75,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			w.CloseWithError(gif.EncodeAll(w, dgif))
 		}()
 		done()
-		return bot.sendFile(m.ChannelID, m.ID, "gif", r)
+		return bot.sendFile(m.ChannelID, m.ID, "uncaption", ".gif", r)
 	}
 	in, err := downloadInput(resp.Body)
 	resp.Body.Close()
@@ -123,7 +123,7 @@ func (bot *Bot) Uncaption(m *gateway.MessageCreateEvent) error {
 			streams = append(streams, ff.Audio(instream))
 		}
 	}
-	out, err := bot.createOutput(m.ID, outfmt)
+	out, err := bot.createOutput(m.ID, "uncaption", "."+outfmt)
 	if err != nil {
 		return err
 	}
